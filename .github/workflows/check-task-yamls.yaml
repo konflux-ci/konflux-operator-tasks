@@ -1,4 +1,4 @@
-name: Check Tasks and Pipelines YAMLs
+name: Check Tasks YAMLs
 
 "on":
   pull_request:
@@ -29,4 +29,4 @@ jobs:
       - name: Apply all Task & Pipeline YAMLs
         run: |
           set -e
-          ./.github/scripts/check_task_and_pipeline_yamls.sh
+          ./.github/scripts/check_task_yamls.sh
