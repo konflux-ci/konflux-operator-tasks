@@ -12,8 +12,8 @@ require (
 	k8s.io/api v0.34.1
 	k8s.io/apimachinery v0.34.1
 	mvdan.cc/sh/v3 v3.12.0
-	sigs.k8s.io/kustomize/api v0.19.0
-	sigs.k8s.io/kustomize/kyaml v0.19.0
+	sigs.k8s.io/kustomize/api v0.20.1
+	sigs.k8s.io/kustomize/kyaml v0.20.1
 	sigs.k8s.io/yaml v1.6.0
 )
 
@@ -57,7 +57,6 @@ require (
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/cel-go v0.26.1 // indirect
 	github.com/google/gnostic-models v0.7.0 // indirect
-	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.3 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/compress v1.18.1 // indirect
