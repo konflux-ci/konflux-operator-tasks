@@ -6,7 +6,7 @@ toolchain go1.25.4
 
 require (
 	github.com/google/go-cmp v0.7.0
-	github.com/google/go-containerregistry v0.20.6
+	github.com/google/go-containerregistry v0.20.7
 	github.com/tektoncd/pipeline v1.6.0
 	github.com/zregvart/tkn-fmt v0.0.0-20240614122620-a2995427266c
 	k8s.io/api v0.34.2
@@ -30,7 +30,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/containerd/stargz-snapshotter/estargz v0.18.1 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
-	github.com/docker/cli v29.0.2+incompatible // indirect
+	github.com/docker/cli v29.0.3+incompatible // indirect
 	github.com/docker/distribution v2.8.3+incompatible // indirect
 	github.com/docker/docker-credential-helpers v0.9.4 // indirect
 	github.com/emicklei/go-restful/v3 v3.13.0 // indirect
@@ -67,7 +67,6 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.1 // indirect
-	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_golang v1.23.2 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
