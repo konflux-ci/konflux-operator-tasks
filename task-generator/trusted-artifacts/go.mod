@@ -9,8 +9,8 @@ require (
 	github.com/google/go-containerregistry v0.20.7
 	github.com/tektoncd/pipeline v1.7.0
 	github.com/zregvart/tkn-fmt v0.0.0-20240614122620-a2995427266c
-	k8s.io/api v0.34.2
-	k8s.io/apimachinery v0.34.2
+	k8s.io/api v0.34.3
+	k8s.io/apimachinery v0.34.3
 	mvdan.cc/sh/v3 v3.12.0
 	sigs.k8s.io/kustomize/api v0.21.0
 	sigs.k8s.io/kustomize/kyaml v0.21.0
@@ -67,7 +67,6 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.1 // indirect
-	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_golang v1.23.2 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
@@ -101,7 +100,7 @@ require (
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
-	k8s.io/client-go v0.34.2 // indirect
+	k8s.io/client-go v0.34.3 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20251125145642-4e65d59e963e // indirect
 	k8s.io/utils v0.0.0-20251002143259-bc988d571ff4 // indirect
