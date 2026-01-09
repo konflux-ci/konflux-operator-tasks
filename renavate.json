@@ -1,0 +1,65 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:base"
+  ],
+  "dependencyDashboard": false,
+  "prConcurrentLimit": 40,
+  "tekton": {
+    "fileMatch": [
+      "\\.yaml$",
+      "\\.yml$"
+    ],
+    "includePaths": [
+      ".tekton/**",
+      "task/**",
+      "stepactions/**",
+    ]
+  },
+  "packageRules": [
+    {
+      "groupName": "konflux-operator-tasks",
+      "matchFileNames": [
+        "stepactions/fips-operator-check-step-action/**",
+        "task/fbc-fips-check-oci-ta/**",
+        "task/fbc-fips-check/**",
+        "task/fbc-target-index-pruning-check/**",
+        "task/fips-operator-bundle-check-oci-ta/**",
+        "task/fips-operator-bundle-check/**",
+        "task/github-sarif-upload/**",
+        "task/run-opm-command-oci-ta/**",
+        "task/validate-fbc/**",
+        "task/sbom-json-check/**"
+      ],
+    },
+  ],
+  "postUpdateOptions": [
+    "gomodTidy"
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "fileMatch": [
+        ".github/workflows/run-task-tests.yaml"
+      ],
+      "matchStrings": [
+        "ref:\\s+(?<currentDigest>[a-f0-9]{40})"
+      ],
+      "currentValueTemplate": "main",
+      "depNameTemplate": "konflux-ci",
+      "packageNameTemplate": "https://github.com/konflux-ci/konflux-ci",
+      "datasourceTemplate": "git-refs"
+    },
+    {
+      "customType": "regex",
+      "fileMatch": [
+        "^task/.*/recipe\\.yaml$",
+        "^task/.+/patch\\.yaml$"
+      ],
+      "matchStrings": [
+        "(?:image: |tooling-image=)(?:['\"])?(?<depName>[0-9a-z./-]+)(?::(?<currentValue>[0-9a-z.-]+))?@(?<currentDigest>sha256:[a-f0-9]{64})(?:['\"])?"
+      ],
+      "datasourceTemplate": "docker"
+    }
+  ]
+}
