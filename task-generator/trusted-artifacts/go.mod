@@ -1,6 +1,6 @@
 module github.com/konflux-ci/build-definitions/task-generator/trusted-artifacts
 
-go 1.24.0
+go 1.25.0
 
 toolchain go1.25.7
 
@@ -9,8 +9,8 @@ require (
 	github.com/google/go-containerregistry v0.20.7
 	github.com/tektoncd/pipeline v1.9.0
 	github.com/zregvart/tkn-fmt v0.0.0-20240614122620-a2995427266c
-	k8s.io/api v0.34.2
-	k8s.io/apimachinery v0.34.2
+	k8s.io/api v0.35.1
+	k8s.io/apimachinery v0.35.1
 	mvdan.cc/sh/v3 v3.12.0
 	sigs.k8s.io/kustomize/api v0.21.1
 	sigs.k8s.io/kustomize/kyaml v0.21.1
@@ -52,7 +52,6 @@ require (
 	github.com/go-openapi/swag/stringutils v0.25.4 // indirect
 	github.com/go-openapi/swag/typeutils v0.25.4 // indirect
 	github.com/go-openapi/swag/yamlutils v0.25.4 // indirect
-	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/cel-go v0.27.0 // indirect
@@ -99,7 +98,7 @@ require (
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
-	k8s.io/client-go v0.34.2 // indirect
+	k8s.io/client-go v0.35.1 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20251125145642-4e65d59e963e // indirect
 	k8s.io/utils v0.0.0-20260108192941-914a6e750570 // indirect
