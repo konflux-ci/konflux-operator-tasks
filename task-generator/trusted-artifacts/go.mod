@@ -1,6 +1,6 @@
 module github.com/konflux-ci/build-definitions/task-generator/trusted-artifacts
 
-go 1.24.0
+go 1.25.0
 
 toolchain go1.25.7
 
@@ -11,7 +11,7 @@ require (
 	github.com/zregvart/tkn-fmt v0.0.0-20240614122620-a2995427266c
 	k8s.io/api v0.34.2
 	k8s.io/apimachinery v0.34.2
-	mvdan.cc/sh/v3 v3.12.0
+	mvdan.cc/sh/v3 v3.13.0
 	sigs.k8s.io/kustomize/api v0.21.1
 	sigs.k8s.io/kustomize/kyaml v0.21.1
 	sigs.k8s.io/yaml v1.6.0
@@ -86,8 +86,8 @@ require (
 	golang.org/x/net v0.49.0 // indirect
 	golang.org/x/oauth2 v0.34.0 // indirect
 	golang.org/x/sync v0.19.0 // indirect
-	golang.org/x/sys v0.40.0 // indirect
-	golang.org/x/term v0.39.0 // indirect
+	golang.org/x/sys v0.42.0 // indirect
+	golang.org/x/term v0.40.0 // indirect
 	golang.org/x/text v0.33.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.5.0 // indirect
