@@ -29,7 +29,7 @@ spec:
   - name: dockerfile
     value: Dockerfile
   - name: path-context
-    value: task/fbc-fips-check-oci-ta/0.1
+    value: task/fbc-fips-check-oci-ta/0.1,!task/fbc-fips-check-oci-ta/0.1/recipe.yaml
   pipelineSpec:
     finally:
     - name: show-summary
@@ -212,7 +212,7 @@ spec:
         - name: name
           value: tkn-bundle-oci-ta
         - name: bundle
-          value: quay.io/konflux-ci/tekton-catalog/task-tkn-bundle-oci-ta:0.2@sha256:6bbc1d6e15253476038c7f5b136b1875a83cd002781e56b24df60dd3735cc15c
+          value: quay.io/konflux-ci/tekton-catalog/task-tkn-bundle-oci-ta:0.2@sha256:35ebaaa9ad1b44086f5d92805a5b2eaa8ff26cb9516b7212b64c6b0caf0b6440
         - name: kind
           value: task
         resolver: bundles
