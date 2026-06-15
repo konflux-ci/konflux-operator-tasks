@@ -20,7 +20,7 @@ jobs:
           go-version-file: './${{matrix.path}}/go.mod'
           cache-dependency-path: ./${{matrix.path}}/go.sum
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@09dada95f1915e08fa7eb2c56d061a83807ad91f
+        uses: golangci/golangci-lint-action@8872e8d04c73fcdce3d942f99fbbe16ea722b6de
         with:
           working-directory: ${{matrix.path}}
           args: "--timeout=10m --build-tags='normal periodic'"
