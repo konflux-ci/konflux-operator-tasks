@@ -15,7 +15,7 @@ jobs:
           - task-generator/trusted-artifacts
     steps:
       - uses: actions/checkout@09d2acae674a48949e3602304ab46fd20ae0c42f
-      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5
+      - uses: actions/setup-go@4a2405e6aebff6aabd8e43618539aa35cf90ac92
         with:
           go-version-file: './${{matrix.path}}/go.mod'
           cache-dependency-path: ./${{matrix.path}}/go.sum
@@ -35,7 +35,7 @@ jobs:
     steps:
       - uses: actions/checkout@09d2acae674a48949e3602304ab46fd20ae0c42f
       - name: Install Go
-        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5
+        uses: actions/setup-go@4a2405e6aebff6aabd8e43618539aa35cf90ac92
         with:
           go-version-file: './${{matrix.path}}/go.mod'
           cache-dependency-path: ./${{matrix.path}}/go.sum
@@ -78,7 +78,7 @@ jobs:
           - task-generator/trusted-artifacts
     steps:
       - uses: actions/checkout@09d2acae674a48949e3602304ab46fd20ae0c42f
-      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5
+      - uses: actions/setup-go@4a2405e6aebff6aabd8e43618539aa35cf90ac92
         with:
           go-version-file: './${{matrix.path}}/go.mod'
           cache-dependency-path: ./${{matrix.path}}/go.sum
