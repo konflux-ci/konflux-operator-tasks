@@ -18,6 +18,9 @@ spec:
       description: Image digest to scan.
     - name: image-url
       description: Image URL.
+    - name: MAX_PARALLEL
+      description: Maximum number of images to process in parallel
+      default: "8"
   results:
     - name: TEST_OUTPUT
       description: Tekton task test output.
@@ -26,13 +29,13 @@ spec:
       description: Images processed in the task.
   steps:
     - name: get-unique-related-images
-      image: quay.io/konflux-ci/konflux-test:v1.4.37@sha256:09328e5f47da168ffe951ec9c4242cd6761e61e0a235df1bba3f5158e757446d
+      image: quay.io/konflux-ci/konflux-test:v1.5.1@sha256:e6b090c515168c8ed0fa932ffe0ac6f27dbc1ea41fdb2fe83cfcaa7829b910bd
       computeResources:
         limits:
-          memory: 8Gi
+          memory: 12Gi
         requests:
-          memory: 8Gi
-          cpu: 500m
+          memory: 12Gi
+          cpu: '1'
       env:
         - name: IMAGE_URL
           value: $(params.image-url)
@@ -124,22 +127,31 @@ spec:
     - name: fips-operator-check-step-action
       computeResources:
         limits:
-          memory: 8Gi
+          memory: 12Gi
         requests:
-          memory: 8Gi
-          cpu: 500m
+          memory: 12Gi
+          cpu: '8'
+      params:
+        - name: MAX_PARALLEL
+          value: $(params.MAX_PARALLEL)
       ref:
         resolver: git
         params:
           - name: url
             value: https://github.com/konflux-ci/build-definitions
           - name: revision
-            value: 5394c347b0f67c516bc7ebad3144cfe38ce6b0b4
+            value: e96f4c79387f635a1a49cb3298541ab25b3ddada
           - name: pathInRepo
             value: stepactions/fips-operator-check-step-action/0.1/fips-operator-check-step-action.yaml
 
     - name: parse-images-processed-result
-      image: quay.io/konflux-ci/konflux-test:v1.4.37@sha256:09328e5f47da168ffe951ec9c4242cd6761e61e0a235df1bba3f5158e757446d
+      image: quay.io/konflux-ci/konflux-test:v1.5.1@sha256:e6b090c515168c8ed0fa932ffe0ac6f27dbc1ea41fdb2fe83cfcaa7829b910bd
+      computeResources:
+        limits:
+          memory: 64Mi
+        requests:
+          memory: 64Mi
+          cpu: 50m
       script: |
         #!/usr/bin/env bash
         set -euo pipefail

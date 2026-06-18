@@ -69,7 +69,7 @@ spec:
         requests:
           cpu: 100m
           memory: 256Mi
-      image: quay.io/konflux-ci/konflux-test:v1.4.28@sha256:4a5423e125fc28db800421422d9933290dc4b62a22401d74cd3348c03107a5d9
+      image: quay.io/konflux-ci/konflux-test:v1.5.0@sha256:fbd5ad045b902065990218922aa6f343e8eb5fd039ecd445bc54819b8e968c3e
       # per https://kubernetes.io/docs/concepts/containers/images/#imagepullpolicy-defaulting
       # the cluster will set imagePullPolicy to IfNotPresent
       workingDir: /var/workdir/inspect-image
@@ -131,52 +131,36 @@ spec:
         digests_processed_string=$(IFS=,; echo "${digests_processed[*]}")
         echo "${images_processed_template/\[%s]/[$digests_processed_string]}" | tee "$(results.IMAGES_PROCESSED.path)"
 
-        status=-1
-        max_run=5
-        sleep_sec=10
-        for run in $(seq 1 $max_run); do
-          status=0
-          [ "$run" -gt 1 ] && sleep $sleep_sec  # skip last sleep
-          echo "Inspecting manifest for source image ${image_with_digest} (try $run/$max_run)."
-          skopeo inspect --no-tags docker://"${image_with_digest}" > "$IMAGE_INSPECT" && break || status=$?
-          if [ "$status" -eq 0 ]; then
-            break
-          fi
-        done
-        if [ "$status" -ne 0 ]; then
-            echo "Failed to inspect image ${image_with_digest}"
-            note="Step inspect-image failed: Encountered errors while inspecting image. For details, check Tekton task log."
-            TEST_OUTPUT=$(make_result_json -r ERROR -t "$note")
-            echo "${TEST_OUTPUT}" | tee "$(results.TEST_OUTPUT.path)"
-            exit 0
+        skopeo_retries=3
+
+        echo "Inspecting manifest for source image ${image_with_digest}."
+        if ! retry skopeo inspect --retry-times "$skopeo_retries" --no-tags docker://"${image_with_digest}" > "$IMAGE_INSPECT"
+        then
+          echo "Failed to inspect image ${image_with_digest}"
+          note="Step inspect-image failed: Encountered errors while inspecting image. For details, check Tekton task log."
+          TEST_OUTPUT=$(make_result_json -r ERROR -t "$note")
+          echo "${TEST_OUTPUT}" | tee "$(results.TEST_OUTPUT.path)"
+          exit 0
         fi
         echo "Image ${image_with_digest} metadata:"
         cat "$IMAGE_INSPECT"
 
-        for run in $(seq 1 $max_run); do
-          status=0
-          [ "$run" -gt 1 ] && sleep $sleep_sec  # skip last sleep
-          echo "Inspecting manifest for source image ${image_with_digest} (try $run/$max_run)."
-          skopeo inspect --no-tags --raw docker://"${image_with_digest}" > "$RAW_IMAGE_INSPECT" || status=$?
-          if [ "$status" -eq 0 ]; then
-            break
-          fi
-        done
-        if [ "$status" -ne 0 ]; then
-            echo "Failed to get raw metadata of image ${image_with_digest}"
-            note="Step inspect-image failed: Encountered errors while inspecting image. For details, check Tekton task log."
-            TEST_OUTPUT=$(make_result_json -r ERROR -t "$note")
-            echo "${TEST_OUTPUT}" | tee "$(results.TEST_OUTPUT.path)"
-            exit 0
+        echo "Inspecting manifest for source image ${image_with_digest}."
+        if ! retry skopeo inspect --retry-times "$skopeo_retries" --no-tags --raw docker://"${image_with_digest}" > "$RAW_IMAGE_INSPECT"
+        then
+          echo "Failed to get raw metadata of image ${image_with_digest}"
+          note="Step inspect-image failed: Encountered errors while inspecting image. For details, check Tekton task log."
+          TEST_OUTPUT=$(make_result_json -r ERROR -t "$note")
+          echo "${TEST_OUTPUT}" | tee "$(results.TEST_OUTPUT.path)"
+          exit 0
         fi
 
         echo "Image ${image_with_digest} raw metadata:"
         jq < "$RAW_IMAGE_INSPECT" # jq for readable formatting
 
-        status=0
         echo "Getting base image manifest for source image ${image_with_digest}."
-        get_base_image "${image_with_digest}" > /shared/base_image || status=$?
-        if [ "$status" -ne 0 ]; then
+        if ! get_base_image "${image_with_digest}" > /shared/base_image
+        then
           echo "Unable to find base image for ${image_with_digest}."
           note="Step inspect-image failed: Cannot find base image. For details, check Tekton task log."
           TEST_OUTPUT=$(make_result_json -r ERROR -t "$note")
@@ -194,24 +178,17 @@ spec:
         echo "" # the above has no newline
         base_image_with_digest=$(cat /shared/base_image_with_digest)
 
-        for run in $(seq 1 $max_run); do
-          status=0
-          [ "$run" -gt 1 ] && sleep $sleep_sec  # skip last sleep
-          echo "Inspecting base image ${base_image_with_digest} (try $run/$max_run)."
-          skopeo inspect --no-tags "docker://$base_image_with_digest"  > "$BASE_IMAGE_INSPECT" && break || status=$?
-          if [ "$status" -eq 0 ]; then
-            break
-          fi
-        done
-        if [ "$status" -ne 0 ]; then
-            echo "Failed to inspect base image ${base_image_with_digest}"
-            note="Step inspect-image failed: Encountered errors while inspecting image. For details, check Tekton task log."
-            TEST_OUTPUT=$(make_result_json -r ERROR -t "$note")
-            echo "${TEST_OUTPUT}" | tee "$(results.TEST_OUTPUT.path)"
-            exit 0
+        echo "Inspecting base image ${base_image_with_digest}."
+        if ! retry skopeo inspect --retry-times "$skopeo_retries" --no-tags "docker://$base_image_with_digest"  > "$BASE_IMAGE_INSPECT"
+        then
+          echo "Failed to inspect base image ${base_image_with_digest}"
+          note="Step inspect-image failed: Encountered errors while inspecting image. For details, check Tekton task log."
+          TEST_OUTPUT=$(make_result_json -r ERROR -t "$note")
+          echo "${TEST_OUTPUT}" | tee "$(results.TEST_OUTPUT.path)"
+          exit 0
         fi
     - name: extract-and-validate
-      image: quay.io/konflux-ci/konflux-test:v1.4.28@sha256:4a5423e125fc28db800421422d9933290dc4b62a22401d74cd3348c03107a5d9
+      image: quay.io/konflux-ci/konflux-test:v1.5.0@sha256:fbd5ad045b902065990218922aa6f343e8eb5fd039ecd445bc54819b8e968c3e
       # per https://kubernetes.io/docs/concepts/containers/images/#imagepullpolicy-defaulting
       # the cluster will set imagePullPolicy to IfNotPresent
       workingDir: /var/workdir/extract-and-validate
@@ -222,9 +199,9 @@ spec:
             - SETFCAP
       computeResources:
         limits:
-          memory: 8Gi
+          memory: 10Gi
         requests:
-          memory: 8Gi
+          memory: 10Gi
           cpu: "8"
       script: |
         #!/usr/bin/env bash
@@ -242,6 +219,7 @@ spec:
         image_with_digest=$(cat /shared/image_with_digest)
         base_image_with_digest=$(cat /shared/base_image_with_digest)
         base_image_repository=$(cat /shared/base_image_repository)
+        note=""
 
         declare -a ALLOWED_BASE_IMAGES=(
           "registry.redhat.io/openshift4/ose-operator-registry"
@@ -353,8 +331,8 @@ spec:
         mv "$OPM_BINARY" /shared/bin/opm
         export PATH=/shared/bin:$PATH
 
-        # We have 9 total checks
-        check_num=9
+        # We have 10 total checks
+        check_num=10
         failure_num=0
         TESTPASSED=true
 
@@ -362,6 +340,53 @@ spec:
           echo "!FAILURE! - grpc_health_probe binary presence check failed."
           failure_num=$((failure_num + 1))
           TESTPASSED=false
+        fi
+
+        ### FBC DIRECTORY STRUCTURE VALIDATION ###
+        echo "Validating FBC directory structure."
+        PACKAGE_DIRS=$(find ".${conffolder}" -mindepth 1 -maxdepth 1 -type d)
+
+        # First, check if any package subdirectories exist at all.
+        if [[ -z "${PACKAGE_DIRS}" ]]; then
+          echo "!FAILURE! - No package subdirectories found inside '.${conffolder}'. At least one is required."
+          echo "--> The FBC image must contain one or more package directories."
+          echo "    Example valid structure:"
+          echo "    ${conffolder}/"
+          echo "    └── <package-name>/"
+
+          # Set the note for the final error report
+          note="FBC directory structure validation failed: No package subdirectories were found inside the '${conffolder}' directory."
+
+          failure_num=$((failure_num + 1))
+          TESTPASSED=false
+        else
+          # Array to hold directories that are found to be empty
+          empty_dirs=()
+
+          # Loop through each found package directory to check if it's empty
+          while IFS= read -r pkg_dir; do
+            # Check if the find command returns anything inside the directory
+            if [[ -z "$(find "${pkg_dir}" -mindepth 1)" ]]; then
+              echo "!FAILURE! - Package directory '${pkg_dir}' is empty."
+              empty_dirs+=("${pkg_dir}")
+            fi
+          done <<< "${PACKAGE_DIRS}"
+
+          # After checking all directories, report if any were empty
+          if [[ ${#empty_dirs[@]} -gt 0 ]]; then
+            echo "--> FBC package directories must not be empty."
+            echo "    Example valid structure:"
+            echo "    ${conffolder}/"
+            echo "    └── <package-name>/"
+
+            # Set a detailed note for the final error report, listing all empty directories
+            note="FBC directory validation failed. The following package directories are empty: ${empty_dirs[*]}"
+
+            failure_num=$((failure_num + 1))
+            TESTPASSED=false
+          else
+            echo "FBC directory structure is valid."
+          fi
         fi
 
         if ! opm validate ."${conffolder}"; then
@@ -405,7 +430,7 @@ spec:
           OCP_BUNDLE_METADATA_THRESHOLD_MINOR=17
           OCP_BUNDLE_METADATA_FORMAT="olm.bundle.object"
 
-          if [[ "${OCP_VER_MAJOR}" -ge "${OCP_BUNDLE_METADATA_THRESHOLD_MAJOR}" ]] && [[ "${OCP_VER_MINOR}" -ge "${OCP_BUNDLE_METADATA_THRESHOLD_MINOR}" ]]; then
+          if [[ "${OCP_VER_MAJOR}" -gt "${OCP_BUNDLE_METADATA_THRESHOLD_MAJOR}" ]] || [[ "${OCP_VER_MAJOR}" -eq "${OCP_BUNDLE_METADATA_THRESHOLD_MAJOR}" && "${OCP_VER_MINOR}" -ge "${OCP_BUNDLE_METADATA_THRESHOLD_MINOR}" ]]; then
              OCP_BUNDLE_METADATA_FORMAT="olm.csv.metadata"
           fi
 
@@ -447,6 +472,7 @@ spec:
         # Get the new related images that are being added so that we can check them for validity
         echo "Rendering target index and finding unreleased related images."
         status=0
+        echo "Running command: get_unreleased_fbc_related_images -i ${image_with_digest}"
         related_images=$(get_unreleased_fbc_related_images -i "$image_with_digest") || status=$?
         if [ $status -ne 0 ]; then
           get_unreleased_fbc_related_images -i "$image_with_digest"
@@ -464,6 +490,9 @@ spec:
         fi
 
         if [ $TESTPASSED == false ]; then
+          if [ -z "$note" ]; then
+            note="Step extract-and-validate failed: Validation checks failed. For details, check Tekton task log."
+          fi
           ERROR_OUTPUT=$(make_result_json -r FAILURE -f $failure_num -s $((check_num - failure_num)) -t "$note")
           echo -n "${ERROR_OUTPUT}" | tee "$(results.TEST_OUTPUT.path)"
         else
@@ -479,7 +508,7 @@ spec:
         requests:
           cpu: 100m
           memory: 256Mi
-      image: quay.io/konflux-ci/oras:latest@sha256:1beeecce012c99794568f74265c065839f9703d28306a8430b667f639343a98b
+      image: quay.io/konflux-ci/oras:latest@sha256:76d221b871642154f32151797186430a9cb8b46a194221870c2a87b1a0b916ff
       script: |
         #!/usr/bin/env bash
         set -euo pipefail
@@ -487,8 +516,13 @@ spec:
           echo "Related images not generated. Skipping attach."
           exit 0
         fi
-        attach-helper --subject "${IMAGE_URL}@${IMAGE_DIGEST}" --media-type-name "related-images+json" --digestfile "$(results.RELATED_IMAGES_DIGEST.path)" \
+        if ! retry attach-helper --subject "${IMAGE_URL}@${IMAGE_DIGEST}" --media-type-name "related-images+json" \
+          --digestfile "$(results.RELATED_IMAGES_DIGEST.path)" \
           /shared/related-images.json
+        then
+          echo "Failed to attach related images to ${IMAGE_URL}@${IMAGE_DIGEST}"
+          exit 1
+        fi
     - name: save-rendered-catalog
       computeResources:
         limits:
@@ -496,7 +530,7 @@ spec:
         requests:
           cpu: 100m
           memory: 256Mi
-      image: quay.io/konflux-ci/oras:latest@sha256:1beeecce012c99794568f74265c065839f9703d28306a8430b667f639343a98b
+      image: quay.io/konflux-ci/oras:latest@sha256:76d221b871642154f32151797186430a9cb8b46a194221870c2a87b1a0b916ff
       script: |
         #!/usr/bin/env bash
         set -euo pipefail
@@ -504,5 +538,10 @@ spec:
           echo "Catalog not generated. Skipping attach."
           exit 0
         fi
-        attach-helper --subject "${IMAGE_URL}@${IMAGE_DIGEST}" --media-type-name "rendered-catalog+json" --digestfile "$(results.RENDERED_CATALOG_DIGEST.path)" \
+        if ! retry attach-helper --subject "${IMAGE_URL}@${IMAGE_DIGEST}" --media-type-name "rendered-catalog+json" \
+          --digestfile "$(results.RENDERED_CATALOG_DIGEST.path)" \
           /shared/catalog.json
+        then
+          echo "Failed to attach catalog to ${IMAGE_URL}@${IMAGE_DIGEST}"
+          exit 1
+        fi
