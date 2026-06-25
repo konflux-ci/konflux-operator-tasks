@@ -73,12 +73,6 @@ spec:
   steps:
     - name: use-trusted-artifact
       image: quay.io/konflux-ci/build-trusted-artifacts:latest@sha256:a246cf2267fe6fa68ae8885c6ca4141923edca3ccf9b56838d1ebe369d31b46d
-      computeResources:
-        limits:
-          memory: 4Gi
-        requests:
-          cpu: 50m
-          memory: 4Gi
       args:
         - use
         - $(params.SOURCE_ARTIFACT)=/var/workdir/source
@@ -336,12 +330,6 @@ spec:
           replace_mirror_pullspec_with_source "${IDMS_PATH_PARAM}" "${FILE_TO_UPDATE_PULLSPEC_PATH}"
     - name: create-trusted-artifact
       image: quay.io/konflux-ci/build-trusted-artifacts:latest@sha256:a246cf2267fe6fa68ae8885c6ca4141923edca3ccf9b56838d1ebe369d31b46d
-      computeResources:
-        limits:
-          memory: 3Gi
-        requests:
-          cpu: 50m
-          memory: 3Gi
       when:
         - input: "$(steps.run-opm-with-user-args.results.skip_create_trusted_artifact)"
           operator: in
