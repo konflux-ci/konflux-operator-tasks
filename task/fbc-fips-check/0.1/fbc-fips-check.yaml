@@ -312,9 +312,9 @@ spec:
         resolver: git
         params:
           - name: url
-            value: https://github.com/konflux-ci/build-definitions
+            value: https://github.com/konflux-ci/konflux-operator-tasks
           - name: revision
-            value: e96f4c79387f635a1a49cb3298541ab25b3ddada
+            value: 908cb431fd008e0d16a158e620ee1dc0ca3098b5
           - name: pathInRepo
             value: stepactions/fips-operator-check-step-action/0.1/fips-operator-check-step-action.yaml
 
