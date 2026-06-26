@@ -333,8 +333,8 @@ spec:
         mv "$OPM_BINARY" /shared/bin/opm
         export PATH=/shared/bin:$PATH
 
-        # We have 11 total checks
-        check_num=11
+        # We have 12 total checks
+        check_num=12
         failure_num=0
         TESTPASSED=true
 
@@ -471,21 +471,27 @@ spec:
           fi
         fi
 
-        # Validate olm.bundle image references are digest-pinned
+        # Validate olm.bundle image references are digest-pinned and from trusted registries
         status=0
         bundle_images=$(jq -r 'select(.schema == "olm.bundle" and .image != null) | .image' ${OPM_RENDERED_CATALOG}) || status=$?
         if [ $status -ne 0 ]; then
           echo "!FAILURE! - Could not extract olm.bundle image references from rendered catalog."
-          failure_num=$((failure_num + 1))
+          echo "Skipping digest-pinning and trusted-registry checks."
+          failure_num=$((failure_num + 2))
           TESTPASSED=false
         else
           digest_pinned_regex='@sha256:[a-fA-F0-9]{64}$'
+          trusted_registry_regex='^registry\.(stage\.)?redhat\.io/'
           non_pinned_images=()
+          wrong_registry_images=()
 
           while IFS= read -r bundle_image; do
             if [[ -n "${bundle_image}" ]]; then
               if [[ ! "${bundle_image}" =~ ${digest_pinned_regex} ]]; then
                 non_pinned_images+=("${bundle_image}")
+              fi
+              if [[ ! "${bundle_image}" =~ ${trusted_registry_regex} ]]; then
+                wrong_registry_images+=("${bundle_image}")
               fi
             fi
           done <<< "${bundle_images}"
@@ -493,6 +499,13 @@ spec:
           if [[ ${#non_pinned_images[@]} -gt 0 ]]; then
             echo "!FAILURE! - The following olm.bundle image references are not digest-pinned:"
             printf '  %s\n' "${non_pinned_images[@]}"
+            failure_num=$((failure_num + 1))
+            TESTPASSED=false
+          fi
+
+          if [[ ${#wrong_registry_images[@]} -gt 0 ]]; then
+            echo "!FAILURE! - The following olm.bundle image references are not from registry.redhat.io or registry.stage.redhat.io:"
+            printf '  %s\n' "${wrong_registry_images[@]}"
             failure_num=$((failure_num + 1))
             TESTPASSED=false
           fi
