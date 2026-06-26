@@ -11,7 +11,7 @@ If that's not something you ever plan to do, consider removing this section.
 
 ### Added
 
-- Added computeResources to all steps.
+- Added computeResources to all task-specific steps.
 
 ## 0.1
 
