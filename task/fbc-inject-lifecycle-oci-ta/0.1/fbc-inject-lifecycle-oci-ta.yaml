@@ -1,0 +1,287 @@
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  labels:
+    app.kubernetes.io/version: "0.1"
+  annotations:
+    tekton.dev/pipelines.minVersion: "0.12.1"
+    tekton.dev/tags: "konflux"
+  name: fbc-inject-lifecycle-oci-ta
+spec:
+  description: >-
+    The fbc-inject-lifecycle-oci-ta task injects lifecycle data into a file-based catalog (FBC) component.
+    Checks whether the component is eligible for lifecycle injection (targets all OCP versions >= 5.0),
+    determines the target OLM packages from the Dockerfile, generates
+    lifecycle JSON files using plcc2fbc, and injects them into the
+    catalog source directories. If the component is not eligible, the task
+    succeeds without performing injection. If the component is eligible,
+    any failure to find packages, generate lifecycle data, or inject it
+    results in task failure.
+  params:
+    - default: .
+      description: Path to the directory to use as context.
+      name: CONTEXT
+      type: string
+    - default: ./Dockerfile
+      description: Path to the Dockerfile to build.
+      name: DOCKERFILE
+      type: string
+    - name: ociArtifactExpiresAfter
+      description: Expiration date for the trusted artifacts created in the
+        OCI repository. An empty string means the artifacts do not expire.
+      type: string
+      default: ""
+    - name: ociStorage
+      description: The OCI repository where the Trusted Artifacts are stored.
+      type: string
+    - description: The Trusted Artifact URI pointing to the artifact with the application source code.
+      name: SOURCE_ARTIFACT
+      type: string
+    - name: caTrustConfigMapName
+      type: string
+      description: The name of the ConfigMap containing the CA bundle for TLS verification.
+      default: trusted-ca
+    - name: caTrustConfigMapKey
+      type: string
+      description: The key in the ConfigMap containing the CA bundle.
+      default: ca-bundle.crt
+  results:
+    - name: SOURCE_ARTIFACT
+      description: The Trusted Artifact URI pointing to the artifact with the application source code.
+    - name: TEST_OUTPUT
+      description: Tekton task test output.
+  volumes:
+    - name: workdir
+      emptyDir: {}
+    - name: shared
+      emptyDir: {}
+    - name: trusted-ca
+      configMap:
+        items:
+          - key: $(params.caTrustConfigMapKey)
+            path: ca-bundle.crt
+        name: $(params.caTrustConfigMapName)
+        optional: true
+  stepTemplate:
+    volumeMounts:
+      - mountPath: /var/workdir
+        name: workdir
+      - mountPath: /shared
+        name: shared
+      - mountPath: /etc/pki/tls/certs/ca-custom-bundle.crt
+        name: trusted-ca
+        readOnly: true
+        subPath: ca-bundle.crt
+  steps:
+    - name: use-trusted-artifact
+      image: quay.io/konflux-ci/build-trusted-artifacts:latest@sha256:3e6dc09d80042c78c0c3bbcb4faf91f493bffc45cdee0978f285a2e57ac8aebb
+      args:
+        - use
+        - $(params.SOURCE_ARTIFACT)=/var/workdir/source
+    - name: check-lifecycle-eligibility
+      image: quay.io/konflux-ci/operator-foundry:0.1@sha256:c9391e9279731f05564d76d62218839c51bb6632137662c58cc4690e5da3090b
+      computeResources:
+        requests:
+          memory: 64Mi
+          cpu: 50m
+        limits:
+          memory: 64Mi
+      workingDir: /var/workdir/source
+      onError: continue
+      env:
+        - name: DOCKERFILE
+          value: $(params.DOCKERFILE)
+      script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        operator-foundry fbc check-lifecycle-eligibility \
+          --dockerfile "${DOCKERFILE}" \
+          --output /shared/eligible
+
+        echo "[INFO] Component eligible for lifecycle injection (targets OCP 5.0+): $(cat /shared/eligible)"
+    - name: get-packages
+      image: quay.io/konflux-ci/operator-foundry:0.1@sha256:c9391e9279731f05564d76d62218839c51bb6632137662c58cc4690e5da3090b
+      computeResources:
+        requests:
+          memory: 64Mi
+          cpu: 50m
+        limits:
+          memory: 64Mi
+      workingDir: /var/workdir/source
+      onError: continue
+      env:
+        - name: DOCKERFILE
+          value: $(params.DOCKERFILE)
+        - name: CONTEXT
+          value: $(params.CONTEXT)
+      script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        if [[ ! -s /shared/eligible ]] || [[ "$(cat /shared/eligible)" != "true" ]]; then
+          echo "[INFO] Not eligible for lifecycle injection (or eligibility check failed), skipping package extraction."
+          exit 0
+        fi
+
+        operator-foundry fbc get-packages \
+          --dockerfile "${DOCKERFILE}" \
+          --build-context "${CONTEXT}" \
+          --output /shared/packages.txt
+
+        if [[ ! -s /shared/packages.txt ]]; then
+          echo "[INFO] No packages requiring lifecycle injection found."
+        else
+          echo "[INFO] Packages to inject lifecycle for: $(cat /shared/packages.txt)"
+        fi
+    - name: generate-lifecycle
+      image: quay.io/konflux-ci/fbc-update-planner:0.1@sha256:836b714ccce3645dce7e30b6e29ef72c80c4e81274a52452f9008865a9828f71
+      computeResources:
+        requests:
+          memory: 256Mi
+          cpu: 100m
+        limits:
+          memory: 256Mi
+      workingDir: /var/workdir/source
+      onError: continue
+      script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        if [[ ! -s /shared/packages.txt ]]; then
+          echo "[INFO] No packages to process, skipping lifecycle generation."
+          exit 0
+        fi
+
+        mkdir -p /shared/lifecycle
+
+        plcc2fbc --package "$(cat /shared/packages.txt)" --split /shared/lifecycle/
+    - name: inject-lifecycle
+      image: quay.io/konflux-ci/operator-foundry:0.1@sha256:c9391e9279731f05564d76d62218839c51bb6632137662c58cc4690e5da3090b
+      computeResources:
+        requests:
+          memory: 64Mi
+          cpu: 50m
+        limits:
+          memory: 64Mi
+      workingDir: /var/workdir/source
+      securityContext:
+        runAsUser: 0
+      results:
+        - name: skip_create_trusted_artifact
+          description: Set to 'true' if create-trusted-artifact should be skipped.
+      env:
+        - name: DOCKERFILE
+          value: $(params.DOCKERFILE)
+        - name: CONTEXT
+          value: $(params.CONTEXT)
+        - name: SOURCE_ARTIFACT
+          value: $(params.SOURCE_ARTIFACT)
+      command: ["/bin/bash", "-c"]
+      args:
+        - |
+          #!/usr/bin/env bash
+          set -euo pipefail
+
+          echo -n "${SOURCE_ARTIFACT}" > "$(results.SOURCE_ARTIFACT.path)"
+
+          # Eligibility check step itself failed to run (script error), not a normal ineligible result.
+          ELIG_EXIT_CODE=$(cat /tekton/steps/step-check-lifecycle-eligibility/exitCode)
+          if [[ "$ELIG_EXIT_CODE" != "0" ]]; then
+            echo "[ERROR] Lifecycle eligibility check failed with exit code $ELIG_EXIT_CODE." >&2
+            note="Task $(context.task.name) failed: lifecycle eligibility check errors. Check logs."
+            operator-foundry make-result-json --result FAILURE --failures 1 --note "${note}" \
+              > "$(results.TEST_OUTPUT.path)"
+            echo -n "true" > "$(step.results.skip_create_trusted_artifact.path)"
+            exit 0
+          fi
+
+          # Eligibility check ran but produced no output file - treat as a tooling failure.
+          if [[ ! -s /shared/eligible ]]; then
+            echo "[ERROR] Lifecycle eligibility check failed to produce output." >&2
+            note="Task $(context.task.name) failed: lifecycle eligibility check errors. Check logs."
+            operator-foundry make-result-json --result FAILURE --failures 1 --note "${note}" \
+              > "$(results.TEST_OUTPUT.path)"
+            echo -n "true" > "$(step.results.skip_create_trusted_artifact.path)"
+            exit 0
+          fi
+
+          # Component does not target OCP 5.0+, so lifecycle injection is not required.
+          # This is expected/valid, not an error - report SUCCESS with zero successes.
+          if [[ "$(cat /shared/eligible)" != "true" ]]; then
+            echo "[INFO] Component not eligible for lifecycle injection (requires OCP 5.0+), skipping."
+            note="Task $(context.task.name) completed: Component not eligible for lifecycle injection (requires OCP 5.0+)."
+            operator-foundry make-result-json --result SUCCESS --successes 0 --note "${note}" \
+              > "$(results.TEST_OUTPUT.path)"
+            echo -n "true" > "$(step.results.skip_create_trusted_artifact.path)"
+            exit 0
+          fi
+
+          # get-packages step itself failed to run (script error), distinct from "no packages found" below.
+          GET_EXIT_CODE=$(cat /tekton/steps/step-get-packages/exitCode)
+          if [[ "$GET_EXIT_CODE" != "0" ]]; then
+            echo "[ERROR] get-packages step failed with exit code $GET_EXIT_CODE." >&2
+            note="Task $(context.task.name) failed: get-packages errors. Check logs."
+            operator-foundry make-result-json --result FAILURE --failures 1 --note "${note}" \
+              > "$(results.TEST_OUTPUT.path)"
+            echo -n "true" > "$(step.results.skip_create_trusted_artifact.path)"
+            exit 0
+          fi
+
+          # Eligible component but no target packages found - this is a hard failure,
+          # since eligible components are expected to always have packages.
+          if [[ ! -s /shared/packages.txt ]]; then
+            echo "[ERROR] Component is eligible for lifecycle injection but no packages were found." >&2
+            note="Task $(context.task.name) failed: Component eligible (OCP 5.0+) but no packages requiring lifecycle injection were found."
+            operator-foundry make-result-json --result FAILURE --failures 1 --note "${note}" \
+              > "$(results.TEST_OUTPUT.path)"
+            echo -n "true" > "$(step.results.skip_create_trusted_artifact.path)"
+            exit 0
+          fi
+
+          # generate-lifecycle step itself failed to run (script error);
+          # plcc2fbc validation failures land here too since the script propagates plcc2fbc's exit code.
+          GEN_EXIT_CODE=$(cat /tekton/steps/step-generate-lifecycle/exitCode)
+          if [[ "$GEN_EXIT_CODE" != "0" ]]; then
+            echo "[ERROR] plcc2fbc generation failed with exit code $GEN_EXIT_CODE." >&2
+            note="Task $(context.task.name) failed: plcc2fbc generation errors. Check logs."
+            operator-foundry make-result-json --result FAILURE --failures 1 --note "${note}" \
+              > "$(results.TEST_OUTPUT.path)"
+            echo -n "true" > "$(step.results.skip_create_trusted_artifact.path)"
+            exit 0
+          fi
+
+          if ! operator-foundry fbc inject-lifecycle \
+            --dockerfile "${DOCKERFILE}" \
+            --build-context "${CONTEXT}" \
+            --packages "$(cat /shared/packages.txt)" \
+            --lifecycle-dir /shared/lifecycle/; then
+
+            # Injection itself failed despite valid packages and lifecycle data being available.
+            echo "[ERROR] Failed to inject lifecycle data" >&2
+            note="Task $(context.task.name) failed: lifecycle injection errors. Check logs."
+            operator-foundry make-result-json --result FAILURE --failures 1 --note "${note}" \
+              > "$(results.TEST_OUTPUT.path)"
+            echo -n "true" > "$(step.results.skip_create_trusted_artifact.path)"
+            exit 0
+          fi
+
+          note="Task $(context.task.name) completed: Lifecycle data injected successfully."
+          operator-foundry make-result-json --result SUCCESS --successes 1 --note "${note}" \
+            > "$(results.TEST_OUTPUT.path)"
+          echo -n "false" > "$(step.results.skip_create_trusted_artifact.path)"
+    - name: create-trusted-artifact
+      image: quay.io/konflux-ci/build-trusted-artifacts:latest@sha256:3e6dc09d80042c78c0c3bbcb4faf91f493bffc45cdee0978f285a2e57ac8aebb
+      when:
+        - input: "$(steps.inject-lifecycle.results.skip_create_trusted_artifact)"
+          operator: in
+          values: ["false"]
+      env:
+      - name: IMAGE_EXPIRES_AFTER
+        value: $(params.ociArtifactExpiresAfter)
+      args:
+        - create
+        - --store
+        - $(params.ociStorage)
+        - $(results.SOURCE_ARTIFACT.path)=/var/workdir/source
