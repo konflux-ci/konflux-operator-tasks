@@ -78,6 +78,12 @@ spec:
         - $(params.SOURCE_ARTIFACT)=/var/workdir/source
     - name: run-opm-with-user-args
       image: quay.io/konflux-ci/operator-sdk-builder:latest@sha256:2737ff035f3a6d94e189cd31e7653998525c52f4d4db994ba1874a3a74bb4912
+      computeResources:
+        limits:
+          memory: 512Mi
+        requests:
+          cpu: 100m
+          memory: 512Mi
       workingDir: /var/workdir/source
       results:
         - name: skip_create_trusted_artifact
@@ -133,6 +139,12 @@ spec:
         - $(params.OPM_ARGS[*])
     - name: convert-image-tags-to-digests
       image: quay.io/konflux-ci/konflux-test:v1.5.0@sha256:fbd5ad045b902065990218922aa6f343e8eb5fd039ecd445bc54819b8e968c3e
+      computeResources:
+        limits:
+          memory: 64Mi
+        requests:
+          cpu: 250m
+          memory: 64Mi
       workingDir: /var/workdir/source
       securityContext:
         runAsUser: 0
@@ -278,6 +290,12 @@ spec:
         convert_tags_to_digests
     - name: replace-related-images-pullspec-in-file
       image: quay.io/konflux-ci/konflux-test:v1.5.0@sha256:fbd5ad045b902065990218922aa6f343e8eb5fd039ecd445bc54819b8e968c3e
+      computeResources:
+        limits:
+          memory: 64Mi
+        requests:
+          cpu: 50m
+          memory: 64Mi
       workingDir: /var/workdir/source
       securityContext:
         runAsUser: 0
