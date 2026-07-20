@@ -92,12 +92,15 @@ spec:
       env:
         - name: DOCKERFILE
           value: $(params.DOCKERFILE)
+        - name: CONTEXT
+          value: $(params.CONTEXT)
       script: |
         #!/usr/bin/env bash
         set -euo pipefail
 
         operator-foundry fbc check-lifecycle-eligibility \
           --dockerfile "${DOCKERFILE}" \
+          --build-context "${CONTEXT}" \
           --output /shared/eligible
 
         echo "[INFO] Component eligible for lifecycle injection (targets OCP 5.0+): $(cat /shared/eligible)"
