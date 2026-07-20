@@ -36,6 +36,12 @@ To validate bundle metadata, the test evaluates bundle metadata usage against th
 - for 4.16 and earlier, fragments must use `olm.bundle.object` (and not use `olm.csv.metadata`)
 - for 4.17 and later, fragments must use `olm.csv.metadata` (and not use `olm.bundle.object`)
 
+### Digest-pinned bundle image references
+To validate supply chain integrity and ensure reproducible builds, all `olm.bundle` image references in the rendered catalog must be digest-pinned, i.e. use the `@sha256:<digest>` format rather than a floating tag. Any non-pinned reference causes a validation failure.
+
+### Trusted registry for bundle image references
+To validate that bundle images originate from trusted sources, all `olm.bundle` image references must come from `registry.redhat.io` or `registry.stage.redhat.io`. References pointing to any other registry cause a validation failure.
+
 ## Data output
 ### Related images
 
