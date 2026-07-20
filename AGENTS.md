@@ -42,6 +42,15 @@ task/<name>/
     └── tests/               # Tekton integration tests
 ```
 
+## Multi-version task consistency
+
+Some tasks have multiple version directories (e.g., `task/validate-fbc/0.1/` and `0.2/`). When modifying a task that has more than one version:
+
+1. **Check for other versions.** List the version directories under `task/<name>/` before making changes.
+2. **Propagate changes to all versions** unless there is a documented reason for divergence. If a newer version's `CHANGELOG.md` states "no functional changes," it should mirror the older version's logic.
+3. **Check `CHANGELOG.md`** to understand the relationship between versions and whether divergence is intentional.
+4. **Update documentation across all versions.** Keep `README.md` and any other docs in sync when the underlying behavior changes.
+
 ## OCI-TA variants
 
 Generated from base tasks by `task-generator/trusted-artifacts/`. Run `hack/generate-ta-tasks.sh` after modifying a base task that has an OCI-TA counterpart. Do not edit `*-oci-ta` task YAMLs by hand.
