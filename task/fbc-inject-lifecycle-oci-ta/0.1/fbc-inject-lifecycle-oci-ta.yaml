@@ -80,7 +80,7 @@ spec:
         - use
         - $(params.SOURCE_ARTIFACT)=/var/workdir/source
     - name: check-lifecycle-eligibility
-      image: quay.io/konflux-ci/operator-foundry:0.1@sha256:c9391e9279731f05564d76d62218839c51bb6632137662c58cc4690e5da3090b
+      image: quay.io/konflux-ci/operator-foundry:0.1@sha256:f6c0c59ac0891511c9edee848d138c63fa854327c2735f025fb86aa6666a0348
       computeResources:
         requests:
           memory: 64Mi
@@ -92,17 +92,20 @@ spec:
       env:
         - name: DOCKERFILE
           value: $(params.DOCKERFILE)
+        - name: CONTEXT
+          value: $(params.CONTEXT)
       script: |
         #!/usr/bin/env bash
         set -euo pipefail
 
         operator-foundry fbc check-lifecycle-eligibility \
           --dockerfile "${DOCKERFILE}" \
+          --build-context "${CONTEXT}" \
           --output /shared/eligible
 
         echo "[INFO] Component eligible for lifecycle injection (targets OCP 5.0+): $(cat /shared/eligible)"
     - name: get-packages
-      image: quay.io/konflux-ci/operator-foundry:0.1@sha256:c9391e9279731f05564d76d62218839c51bb6632137662c58cc4690e5da3090b
+      image: quay.io/konflux-ci/operator-foundry:0.1@sha256:f6c0c59ac0891511c9edee848d138c63fa854327c2735f025fb86aa6666a0348
       computeResources:
         requests:
           memory: 64Mi
@@ -158,7 +161,7 @@ spec:
 
         plcc2fbc --package "$(cat /shared/packages.txt)" --split /shared/lifecycle/
     - name: inject-lifecycle
-      image: quay.io/konflux-ci/operator-foundry:0.1@sha256:c9391e9279731f05564d76d62218839c51bb6632137662c58cc4690e5da3090b
+      image: quay.io/konflux-ci/operator-foundry:0.1@sha256:f6c0c59ac0891511c9edee848d138c63fa854327c2735f025fb86aa6666a0348
       computeResources:
         requests:
           memory: 64Mi
