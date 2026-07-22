@@ -27,6 +27,11 @@ spec:
       description: Path to the Dockerfile to build.
       name: DOCKERFILE
       type: string
+    - name: BUILD_ARGS
+      description: Array of --build-arg values ("arg=value" strings) used to
+        resolve ARG references in the base image tag.
+      type: array
+      default: []
     - name: ociArtifactExpiresAfter
       description: Expiration date for the trusted artifacts created in the
         OCI repository. An empty string means the artifacts do not expire.
@@ -80,7 +85,7 @@ spec:
         - use
         - $(params.SOURCE_ARTIFACT)=/var/workdir/source
     - name: check-lifecycle-eligibility
-      image: quay.io/konflux-ci/operator-foundry:0.1@sha256:f6c0c59ac0891511c9edee848d138c63fa854327c2735f025fb86aa6666a0348
+      image: quay.io/konflux-ci/operator-foundry:0.1@sha256:d83358368862108fcd3db9bf0241456bdf68cb1c77c6a4ca1a99bf0085094162
       computeResources:
         requests:
           memory: 64Mi
@@ -94,18 +99,26 @@ spec:
           value: $(params.DOCKERFILE)
         - name: CONTEXT
           value: $(params.CONTEXT)
+      args:
+        - "$(params.BUILD_ARGS[*])"
       script: |
         #!/usr/bin/env bash
         set -euo pipefail
 
+        BUILD_ARG_FLAGS=()
+        for build_arg in "$@"; do
+          BUILD_ARG_FLAGS+=(--build-arg "${build_arg}")
+        done
+
         operator-foundry fbc check-lifecycle-eligibility \
           --dockerfile "${DOCKERFILE}" \
           --build-context "${CONTEXT}" \
+          "${BUILD_ARG_FLAGS[@]}" \
           --output /shared/eligible
 
         echo "[INFO] Component eligible for lifecycle injection (targets OCP 5.0+): $(cat /shared/eligible)"
     - name: get-packages
-      image: quay.io/konflux-ci/operator-foundry:0.1@sha256:f6c0c59ac0891511c9edee848d138c63fa854327c2735f025fb86aa6666a0348
+      image: quay.io/konflux-ci/operator-foundry:0.1@sha256:d83358368862108fcd3db9bf0241456bdf68cb1c77c6a4ca1a99bf0085094162
       computeResources:
         requests:
           memory: 64Mi
@@ -161,7 +174,7 @@ spec:
 
         plcc2fbc --package "$(cat /shared/packages.txt)" --split /shared/lifecycle/
     - name: inject-lifecycle
-      image: quay.io/konflux-ci/operator-foundry:0.1@sha256:f6c0c59ac0891511c9edee848d138c63fa854327c2735f025fb86aa6666a0348
+      image: quay.io/konflux-ci/operator-foundry:0.1@sha256:d83358368862108fcd3db9bf0241456bdf68cb1c77c6a4ca1a99bf0085094162
       computeResources:
         requests:
           memory: 64Mi

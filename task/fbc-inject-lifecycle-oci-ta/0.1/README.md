@@ -9,6 +9,7 @@ Lifecycle injection is skipped (with a successful result) if not all targeted OC
 |---|---|---|---|
 |CONTEXT|Path to the directory to use as context.|.|false|
 |DOCKERFILE|Path to the Dockerfile to build.|./Dockerfile|false|
+|BUILD_ARGS|Array of --build-arg values ("arg=value" strings) used to resolve ARG references in the base image tag.|[]|false|
 |SOURCE_ARTIFACT|The Trusted Artifact URI pointing to the artifact with the application source code.||true|
 |ociStorage|The OCI repository where the Trusted Artifacts are stored.||true|
 |ociArtifactExpiresAfter|Expiration date for the trusted artifacts created in the OCI repository. An empty string means the artifacts do not expire.|""|false|
