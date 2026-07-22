@@ -24,3 +24,14 @@ No action required. Review and merge the MintMaker PR once CI passes.
 
 If the migration script fails, manually add `fbc-inject-lifecycle` following the
 standard FBC pipeline blueprint in `build-definitions`.
+
+**Note:** The `fbc-inject-lifecycle-oci-ta` task accepts an optional
+`BUILD_ARGS` parameter (defaults to empty). If your Dockerfile uses
+`ARG` directives to parameterize the base image (`FROM`) or file paths
+in `COPY`/`ADD` instructions, add the parameter manually to your
+PipelineRun definition after merging, for example:
+
+     - name: BUILD_ARGS
+       value:
+         - "BASE_IMAGE=<your-base-image>"
+         - "CATALOG_DIR=my-catalog"
