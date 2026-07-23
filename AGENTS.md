@@ -37,7 +37,7 @@ task/<name>/
 └── <version>/
     ├── <name>.yaml          # Tekton Task definition
     ├── README.md
-    ├── recipe.yaml          # OCI-TA tasks only
+    ├── recipe.yaml          # Generated OCI-TA tasks only
     ├── spec/                # ShellSpec tests
     └── tests/               # Tekton integration tests
 ```
@@ -53,7 +53,9 @@ Some tasks have multiple version directories (e.g., `task/validate-fbc/0.1/` and
 
 ## OCI-TA variants
 
-Generated from base tasks by `task-generator/trusted-artifacts/`. Run `hack/generate-ta-tasks.sh` after modifying a base task that has an OCI-TA counterpart. Do not edit `*-oci-ta` task YAMLs by hand.
+Some `*-oci-ta` tasks are **generated** from base tasks by `task-generator/trusted-artifacts/`. These tasks have a `recipe.yaml` file that references their base task. After modifying a base task that has a generated OCI-TA counterpart, run `hack/generate-ta-tasks.sh` to regenerate. Do not edit generated `*-oci-ta` task YAMLs by hand — check for `recipe.yaml` first.
+
+Other `*-oci-ta` tasks are **standalone** — they have no base task and no `recipe.yaml`. These are authored and edited directly like any other task.
 
 ## CI checks
 
