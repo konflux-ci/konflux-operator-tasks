@@ -4,7 +4,7 @@
 
 ### Added
 
-- Initial version of `fbc-inject-lifecycle-oci-ta` task
+- Initial version of `fbc-inject-lifecycle` task
 - Checks whether a file-based catalog (FBC) component is eligible for lifecycle injection (targets OCP 5.0+)
 - Determines target OLM packages from the Dockerfile
 - Generates lifecycle JSON files using `plcc2fbc`
@@ -12,4 +12,4 @@
 
 ### Note
 
-This is the Trusted Artifacts variant of `fbc-inject-lifecycle` (`fbc-inject-lifecycle` uses a workspace source instead of `SOURCE_ARTIFACT`).
+Workspace-source variant; the Trusted Artifacts equivalent is `fbc-inject-lifecycle-oci-ta`.
