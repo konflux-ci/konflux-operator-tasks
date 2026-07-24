@@ -1,0 +1,268 @@
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  labels:
+    app.kubernetes.io/version: "0.1"
+  annotations:
+    tekton.dev/pipelines.minVersion: "0.12.1"
+    tekton.dev/tags: "konflux"
+  name: fbc-inject-lifecycle
+spec:
+  description: >-
+    The fbc-inject-lifecycle task injects lifecycle data into a file-based catalog (FBC) component.
+    Checks whether the component is eligible for lifecycle injection (targets all OCP versions >= 5.0),
+    determines the target OLM packages from the Dockerfile, generates
+    lifecycle JSON files using plcc2fbc, and injects them into the
+    catalog source directories. If the component is not eligible, the task
+    succeeds without performing injection. If the component is eligible,
+    any failure to find packages, generate lifecycle data, or inject it
+    results in task failure.
+  params:
+    - default: .
+      description: Path to the directory to use as context.
+      name: CONTEXT
+      type: string
+    - default: ./Dockerfile
+      description: Path to the Dockerfile to build.
+      name: DOCKERFILE
+      type: string
+    - name: BUILD_ARGS
+      description: Array of --build-arg values ("arg=value" strings) used to
+        resolve ARG references in the base image tag.
+      type: array
+      default: []
+    - name: caTrustConfigMapName
+      type: string
+      description: The name of the ConfigMap containing the CA bundle for TLS verification.
+      default: trusted-ca
+    - name: caTrustConfigMapKey
+      type: string
+      description: The key in the ConfigMap containing the CA bundle.
+      default: ca-bundle.crt
+  results:
+    - name: TEST_OUTPUT
+      description: Tekton task test output.
+  volumes:
+    - name: shared
+      emptyDir: {}
+    - name: trusted-ca
+      configMap:
+        items:
+          - key: $(params.caTrustConfigMapKey)
+            path: ca-bundle.crt
+        name: $(params.caTrustConfigMapName)
+        optional: true
+  stepTemplate:
+    volumeMounts:
+      - mountPath: /shared
+        name: shared
+      - mountPath: /etc/pki/tls/certs/ca-custom-bundle.crt
+        name: trusted-ca
+        readOnly: true
+        subPath: ca-bundle.crt
+  steps:
+    - name: check-lifecycle-eligibility
+      image: quay.io/konflux-ci/operator-foundry:0.1@sha256:d83358368862108fcd3db9bf0241456bdf68cb1c77c6a4ca1a99bf0085094162 
+      computeResources:
+        requests:
+          memory: 64Mi
+          cpu: 50m
+        limits:
+          memory: 64Mi
+      workingDir: $(workspaces.workspace.path)/source
+      onError: continue
+      env:
+        - name: DOCKERFILE
+          value: $(params.DOCKERFILE)
+        - name: CONTEXT
+          value: $(params.CONTEXT)
+      args:
+        - "$(params.BUILD_ARGS[*])"
+      script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        BUILD_ARG_FLAGS=()
+        for build_arg in "$@"; do
+          BUILD_ARG_FLAGS+=(--build-arg "${build_arg}")
+        done
+
+        operator-foundry fbc check-lifecycle-eligibility \
+          --dockerfile "${DOCKERFILE}" \
+          --build-context "${CONTEXT}" \
+          "${BUILD_ARG_FLAGS[@]}" \
+          --output /shared/eligible
+
+        echo "[INFO] Component eligible for lifecycle injection (targets OCP 5.0+): $(cat /shared/eligible)"
+    - name: get-packages
+      image: quay.io/konflux-ci/operator-foundry:0.1@sha256:d83358368862108fcd3db9bf0241456bdf68cb1c77c6a4ca1a99bf0085094162
+      computeResources:
+        requests:
+          memory: 64Mi
+          cpu: 50m
+        limits:
+          memory: 64Mi
+      workingDir: $(workspaces.workspace.path)/source
+      onError: continue
+      env:
+        - name: DOCKERFILE
+          value: $(params.DOCKERFILE)
+        - name: CONTEXT
+          value: $(params.CONTEXT)
+      args:
+        - "$(params.BUILD_ARGS[*])"
+      script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        if [[ ! -s /shared/eligible ]] || [[ "$(cat /shared/eligible)" != "true" ]]; then
+          echo "[INFO] Not eligible for lifecycle injection (or eligibility check failed), skipping package extraction."
+          exit 0
+        fi
+
+        BUILD_ARG_FLAGS=()
+        for build_arg in "$@"; do
+          BUILD_ARG_FLAGS+=(--build-arg "${build_arg}")
+        done
+
+        operator-foundry fbc get-packages \
+          --dockerfile "${DOCKERFILE}" \
+          --build-context "${CONTEXT}" \
+          "${BUILD_ARG_FLAGS[@]}" \
+          --output /shared/packages.txt
+
+        if [[ ! -s /shared/packages.txt ]]; then
+          echo "[INFO] No packages requiring lifecycle injection found."
+        else
+          echo "[INFO] Packages to inject lifecycle for: $(cat /shared/packages.txt)"
+        fi
+    - name: generate-lifecycle
+      image: quay.io/konflux-ci/fbc-update-planner:0.1@sha256:7b8fea59f808ec8863fb9f0100f5d79d3b87820583c076219495f83a11abef86
+      computeResources:
+        requests:
+          memory: 256Mi
+          cpu: 100m
+        limits:
+          memory: 256Mi
+      workingDir: $(workspaces.workspace.path)/source
+      onError: continue
+      script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        if [[ ! -s /shared/packages.txt ]]; then
+          echo "[INFO] No packages to process, skipping lifecycle generation."
+          exit 0
+        fi
+
+        mkdir -p /shared/lifecycle
+
+        plcc2fbc --package "$(cat /shared/packages.txt)" --split /shared/lifecycle/
+    - name: inject-lifecycle
+      image: quay.io/konflux-ci/operator-foundry:0.1@sha256:d83358368862108fcd3db9bf0241456bdf68cb1c77c6a4ca1a99bf0085094162
+      computeResources:
+        requests:
+          memory: 64Mi
+          cpu: 50m
+        limits:
+          memory: 64Mi
+      workingDir: $(workspaces.workspace.path)/source
+      securityContext:
+        runAsUser: 0
+      env:
+        - name: DOCKERFILE
+          value: $(params.DOCKERFILE)
+        - name: CONTEXT
+          value: $(params.CONTEXT)
+      args:
+        - "$(params.BUILD_ARGS[*])"
+      script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        BUILD_ARG_FLAGS=()
+        for build_arg in "$@"; do
+          BUILD_ARG_FLAGS+=(--build-arg "${build_arg}")
+        done
+
+        # Eligibility check step itself failed to run (script error), not a normal ineligible result.
+        ELIG_EXIT_CODE=$(cat /tekton/steps/step-check-lifecycle-eligibility/exitCode)
+        if [[ "$ELIG_EXIT_CODE" != "0" ]]; then
+          echo "[ERROR] Lifecycle eligibility check failed with exit code $ELIG_EXIT_CODE." >&2
+          note="Task $(context.task.name) failed: lifecycle eligibility check errors. Check logs."
+          operator-foundry make-result-json --result FAILURE --failures 1 --note "${note}" \
+            > "$(results.TEST_OUTPUT.path)"
+          exit 0
+        fi
+
+        # Eligibility check ran but produced no output file - treat as a tooling failure.
+        if [[ ! -s /shared/eligible ]]; then
+          echo "[ERROR] Lifecycle eligibility check failed to produce output." >&2
+          note="Task $(context.task.name) failed: lifecycle eligibility check errors. Check logs."
+          operator-foundry make-result-json --result FAILURE --failures 1 --note "${note}" \
+            > "$(results.TEST_OUTPUT.path)"
+          exit 0
+        fi
+
+        # Component does not target OCP 5.0+, so lifecycle injection is not required.
+        # This is expected/valid, not an error - report SUCCESS with zero successes.
+        if [[ "$(cat /shared/eligible)" != "true" ]]; then
+          echo "[INFO] Component not eligible for lifecycle injection (requires OCP 5.0+), skipping."
+          note="Task $(context.task.name) completed: Component not eligible for lifecycle injection (requires OCP 5.0+)."
+          operator-foundry make-result-json --result SUCCESS --successes 0 --note "${note}" \
+            > "$(results.TEST_OUTPUT.path)"
+          exit 0
+        fi
+
+        # get-packages step itself failed to run (script error), distinct from "no packages found" below.
+        GET_EXIT_CODE=$(cat /tekton/steps/step-get-packages/exitCode)
+        if [[ "$GET_EXIT_CODE" != "0" ]]; then
+          echo "[ERROR] get-packages step failed with exit code $GET_EXIT_CODE." >&2
+          note="Task $(context.task.name) failed: get-packages errors. Check logs."
+          operator-foundry make-result-json --result FAILURE --failures 1 --note "${note}" \
+            > "$(results.TEST_OUTPUT.path)"
+          exit 0
+        fi
+
+        # Eligible component but no target packages found - this is a hard failure,
+        # since eligible components are expected to always have packages.
+        if [[ ! -s /shared/packages.txt ]]; then
+          echo "[ERROR] Component is eligible for lifecycle injection but no packages were found." >&2
+          note="Task $(context.task.name) failed: Component eligible (OCP 5.0+) but no packages requiring lifecycle injection were found."
+          operator-foundry make-result-json --result FAILURE --failures 1 --note "${note}" \
+            > "$(results.TEST_OUTPUT.path)"
+          exit 0
+        fi
+
+        # generate-lifecycle step itself failed to run (script error);
+        # plcc2fbc validation failures land here too since the script propagates plcc2fbc's exit code.
+        GEN_EXIT_CODE=$(cat /tekton/steps/step-generate-lifecycle/exitCode)
+        if [[ "$GEN_EXIT_CODE" != "0" ]]; then
+          echo "[ERROR] plcc2fbc generation failed with exit code $GEN_EXIT_CODE." >&2
+          note="Task $(context.task.name) failed: plcc2fbc generation errors. Check logs."
+          operator-foundry make-result-json --result FAILURE --failures 1 --note "${note}" \
+            > "$(results.TEST_OUTPUT.path)"
+          exit 0
+        fi
+
+        if ! operator-foundry fbc inject-lifecycle \
+          --dockerfile "${DOCKERFILE}" \
+          --build-context "${CONTEXT}" \
+          --packages "$(cat /shared/packages.txt)" \
+          --lifecycle-dir /shared/lifecycle/ \
+          "${BUILD_ARG_FLAGS[@]}"; then
+
+          # Injection itself failed despite valid packages and lifecycle data being available.
+          echo "[ERROR] Failed to inject lifecycle data" >&2
+          note="Task $(context.task.name) failed: lifecycle injection errors. Check logs."
+          operator-foundry make-result-json --result FAILURE --failures 1 --note "${note}" \
+            > "$(results.TEST_OUTPUT.path)"
+          exit 0
+        fi
+
+        note="Task $(context.task.name) completed: Lifecycle data injected successfully."
+        operator-foundry make-result-json --result SUCCESS --successes 1 --note "${note}" \
+          > "$(results.TEST_OUTPUT.path)"
+  workspaces:
+    - name: workspace
