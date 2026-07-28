@@ -25,6 +25,19 @@
 - Bumped the `operator-foundry` image digest to pick up build-arg support in
   `check-lifecycle-eligibility`, `get-packages`, and `inject-lifecycle`.
 
+### Fixed
+
+- Changed the `inject-lifecycle` step from `script:` to `command`/`args`.
+  This step declares both a task-level result and a step-level result
+  (`skip_create_trusted_artifact`); on Tekton Pipelines versions that predate
+  the fix for [tektoncd/pipeline#8255](https://github.com/tektoncd/pipeline/issues/8255)
+  (fixed by [#10007](https://github.com/tektoncd/pipeline/pull/10007)), that
+  combination trips a validation webhook bug when read from a step's
+  `script:` field, causing the Task to be rejected admission with a
+  "non-existent variable" error. Tekton's step-results validator only
+  inspects `script`, not `command`/`args`, so moving the script there avoids
+  the bug without changing behavior.
+
 ## 0.1
 
 ### Added
