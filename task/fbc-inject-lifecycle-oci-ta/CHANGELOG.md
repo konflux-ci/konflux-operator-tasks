@@ -25,6 +25,12 @@
 - Bumped the `operator-foundry` image digest to pick up build-arg support in
   `check-lifecycle-eligibility`, `get-packages`, and `inject-lifecycle`.
 
+- Bumped the `generate-lifecycle` step image (`quay.io/konflux-ci/fbc-update-planner`)
+  to `0.1.0@sha256:756516302435356d73911a79e2de2ef20a8adf4296009c5aa2b521563e1610dd`.
+
+- Passed `--validators none` to `plcc2fbc` in the `generate-lifecycle` step, so
+  lifecycle generation no longer runs PLCC validators.
+
 ### Fixed
 
 - Changed the `inject-lifecycle` step from `script:` to `command`/`args`.
