@@ -58,3 +58,23 @@ Generated from base tasks by `task-generator/trusted-artifacts/`. Run `hack/gene
 ## CI checks
 
 YAML lint, Checkton, ShellSpec, Tekton integration tests, Go tests (task-generator), and migration validation all run on PRs. Check `.github/workflows/` for details.
+
+## Migration scripts
+
+Migration scripts (`task/<name>/<version>/migrations/<version>.sh`) are **immutable once merged**. The CI check `hack/validate-migration.sh` rejects any PR that modifies or deletes an existing migration file.
+
+To fix a broken migration:
+
+1. Bump the `app.kubernetes.io/version` label in the task YAML (e.g., `0.2` → `0.2.1`)
+2. Create a new migration script (e.g., `migrations/0.2.1.sh`) that supersedes the broken one
+3. Use `hack/create-task-migration.sh` to scaffold the new migration
+
+**Never edit an existing migration script in place.**
+
+Additional constraints enforced by `hack/validate-migration.sh`:
+
+- One migration per task per PR
+- Version-label match requirement
+- Migration must modify at least one Konflux pipeline
+- OCI-TA variant migrations must exist if the base task has an OCI-TA counterpart
+
