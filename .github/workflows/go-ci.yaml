@@ -84,7 +84,8 @@ jobs:
           cache-dependency-path: ./${{matrix.path}}/go.sum
       # https://github.com/securego/gosec/blob/12be14859bc7d4b956b71bef0b443694aa519d8a/README.md#integrating-with-code-scanning
       - name: Run Gosec Security Scanner
-        uses: securego/gosec@master
+        # securego/gosec@master
+        uses: securego/gosec@2eb4727ebc7504944ddbcdd2f7157db492026c3f
         with:
           # we let the report trigger content trigger a failure using the GitHub Security features.
           args: '-tags normal,periodic -no-fail -fmt sarif -out results.sarif ${{matrix.path}}/...'

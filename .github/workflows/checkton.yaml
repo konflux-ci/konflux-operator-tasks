@@ -10,14 +10,16 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        # actions/checkout@v4.4.0
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           # Differential Checkton requires full git history
           fetch-depth: 0
 
       - name: Run Checkton
         id: checkton
-        uses: chmeliik/checkton@v0.4.0
+        # chmeliik/checkton@v0.4.0
+        uses: chmeliik/checkton@c24110a11ba3d4acb90964be57fc1177fed2918f
         with:
           # Set to false when re-enabling SARIF uploads
           fail-on-findings: true
