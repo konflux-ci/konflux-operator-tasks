@@ -1,0 +1,20 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "ignorePaths": [
+    ".github/workflows/check-task-migration.yaml",
+    ".github/workflows/update-shared-ci.yaml"
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "fileMatch": [
+        "\\.github/workflows/check-task-yamls\\.yaml$"
+      ],
+      "matchStrings": [
+        "pipeline_version:\\s+(?<currentValue>v\\d+\\.\\d+\\.\\d+)"
+      ],
+      "depNameTemplate": "tektoncd/pipeline",
+      "datasourceTemplate": "github-releases"
+    }
+  ]
+}
