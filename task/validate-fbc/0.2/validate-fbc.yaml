@@ -9,6 +9,8 @@ metadata:
   annotations:
     tekton.dev/pipelines.minVersion: "0.12.1"
     tekton.dev/tags: "konflux"
+    build.appstudio.redhat.com/expires-on: "2026-09-28T00:00:00Z"
+    build.appstudio.redhat.com/expiry-message: "This task version is deprecated. Please migrate to validate-fbc 0.3."
   name: validate-fbc
 spec:
   description: >-
