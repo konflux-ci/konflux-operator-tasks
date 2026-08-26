@@ -1,3 +1,9 @@
+## Deprecation notice
+
+This task version is deprecated. Please migrate to [validate-fbc 0.3](../0.3/README.md).
+Pipelines still referencing this version will receive a Conforma warning until 2026-09-28
+and a violation after that date.
+
 # validate-fbc task
 
 Ensures file-based catalog (FBC) components are uniquely linted for proper construction as part of build pipeline. The manifest data of container images is checked using OpenShift Operator Framework's opm CLI tool. The opm binary is extracted from the container's base image, which must come from a trusted source.
