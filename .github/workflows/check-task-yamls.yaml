@@ -27,7 +27,7 @@ jobs:
         # tektoncd/actions/setup-tektoncd@main
         uses: tektoncd/actions/setup-tektoncd@2b126ef971bbfda195d8a6c9b7c4eb3bfda452bf
         with:
-          pipeline_version: v1.14.0
+          pipeline_version: v1.16.0
 
       - name: Apply all Task & Pipeline YAMLs
         run: |
