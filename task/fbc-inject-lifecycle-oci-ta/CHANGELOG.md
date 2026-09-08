@@ -4,6 +4,19 @@
 
 ### Added
 
+- Added optional `CATALOG_PATH` param (default `""`). When set, Dockerfile
+  parsing is skipped for the `inject-lifecycle` step and `lifecycle.json` is
+  injected directly into `<CATALOG_PATH>/<package>/` for each package. Intended
+  for FBC images whose COPY instructions targeting `/configs` all use
+  `--from=<stage>`, making the catalog source directory inaccessible on local
+  disk. `DOCKERFILE` is still used by the `check-lifecycle-eligibility` and
+  `get-packages` steps; `CATALOG_PATH` and `DOCKERFILE` are mutually exclusive
+  only at the inject step.
+
+- Bumped the `operator-foundry` image digest to pick up `--catalog-path`
+  support in `inject-lifecycle`
+  (`quay.io/konflux-ci/operator-foundry:0.1@sha256:333fd99341f971adb921b8ec9c8780329eff7e3869dd32460d472f1b952c086f`).
+
 - Added optional `BUILD_ARGS` param, passed as `--build-arg` flags to the
   `check-lifecycle-eligibility`, `get-packages`, and `inject-lifecycle` steps,
   to resolve `ARG` references used in the base image tag or in COPY/ADD source
