@@ -23,7 +23,7 @@ inject_flags_file=$(mktemp) && cleanup+=("${inject_flags_file}")
 # operator-foundry mock: records inject-lifecycle flags; echoes valid JSON for make-result-json
 cat > "${fake_bin}/operator-foundry" << MOCK_EOF
 #!/bin/bash
-if [[ "\$1 \$2 \$3" == "fbc inject-lifecycle" ]]; then
+if [[ "\$1 \$2" == "fbc inject-lifecycle" ]]; then
     echo "\$*" > "${inject_flags_file}"
     exit 0
 fi
