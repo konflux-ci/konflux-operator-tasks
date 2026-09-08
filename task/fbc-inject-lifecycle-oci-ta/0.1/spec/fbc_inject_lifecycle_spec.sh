@@ -27,7 +27,13 @@ if [[ "\$1 \$2" == "fbc inject-lifecycle" ]]; then
     echo "\$*" > "${inject_flags_file}"
     exit 0
 fi
-echo '{"result":"SUCCESS","successes":1}'
+# make-result-json: parse --result VALUE and echo matching JSON
+result="SUCCESS"
+while [[ \$# -gt 0 ]]; do
+    if [[ "\$1" == "--result" ]]; then result="\$2"; fi
+    shift
+done
+echo "{\"result\":\"\${result}\",\"successes\":1}"
 MOCK_EOF
 chmod +x "${fake_bin}/operator-foundry"
 export PATH="${fake_bin}:${PATH}"
@@ -129,7 +135,7 @@ Describe "inject-lifecycle step: downstream step failures"
     End
 
     It "reports FAILURE when eligible but no packages found"
-        echo "" > "${shared_dir}/packages.txt"
+        > "${shared_dir}/packages.txt"
         When call bash "${inject_script}"
         The status should be success
         The contents of file "${results_dir}/TEST_OUTPUT" should include "FAILURE"
