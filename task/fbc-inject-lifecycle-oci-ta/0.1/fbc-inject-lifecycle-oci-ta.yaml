@@ -27,6 +27,13 @@ spec:
       description: Path to the Dockerfile to build.
       name: DOCKERFILE
       type: string
+    - default: ""
+      description: Parent catalog directory relative to CONTEXT (e.g. .konflux/catalog).
+        When set, Dockerfile parsing is skipped and lifecycle.json is injected
+        into <catalog-path>/<package>/ for each package. Use when all COPY
+        instructions targeting /configs use --from=<stage>.
+      name: CATALOG_PATH
+      type: string
     - name: BUILD_ARGS
       description: The array of --build-arg values ("arg=value" strings), passed to
         the check-lifecycle-eligibility, get-packages, and inject-lifecycle
@@ -88,7 +95,7 @@ spec:
         - use
         - $(params.SOURCE_ARTIFACT)=/var/workdir/source
     - name: check-lifecycle-eligibility
-      image: quay.io/konflux-ci/operator-foundry:0.1@sha256:70a3fceca8d568544d302750370dd6d7a31e4145ef45a062e8d2f11392365f76
+      image: quay.io/konflux-ci/operator-foundry:0.1@sha256:333fd99341f971adb921b8ec9c8780329eff7e3869dd32460d472f1b952c086f
       computeResources:
         requests:
           memory: 64Mi
@@ -121,7 +128,7 @@ spec:
 
         echo "[INFO] Component eligible for lifecycle injection (targets OCP 5.0+): $(cat /shared/eligible)"
     - name: get-packages
-      image: quay.io/konflux-ci/operator-foundry:0.1@sha256:70a3fceca8d568544d302750370dd6d7a31e4145ef45a062e8d2f11392365f76
+      image: quay.io/konflux-ci/operator-foundry:0.1@sha256:333fd99341f971adb921b8ec9c8780329eff7e3869dd32460d472f1b952c086f
       computeResources:
         requests:
           memory: 64Mi
@@ -185,7 +192,7 @@ spec:
 
         plcc2fbc --validators none --package "$(cat /shared/packages.txt)" --split /shared/lifecycle/
     - name: inject-lifecycle
-      image: quay.io/konflux-ci/operator-foundry:0.1@sha256:70a3fceca8d568544d302750370dd6d7a31e4145ef45a062e8d2f11392365f76
+      image: quay.io/konflux-ci/operator-foundry:0.1@sha256:333fd99341f971adb921b8ec9c8780329eff7e3869dd32460d472f1b952c086f
       computeResources:
         requests:
           memory: 64Mi
@@ -205,6 +212,8 @@ spec:
           value: $(params.CONTEXT)
         - name: SOURCE_ARTIFACT
           value: $(params.SOURCE_ARTIFACT)
+        - name: CATALOG_PATH
+          value: $(params.CATALOG_PATH)
       command:
         - /bin/bash
         - -c
@@ -286,11 +295,18 @@ spec:
             exit 0
           fi
 
+          INJECT_FLAGS=()
+          if [[ -n "${CATALOG_PATH}" ]]; then
+            INJECT_FLAGS+=(--catalog-path "${CATALOG_PATH}")
+          else
+            INJECT_FLAGS+=(--dockerfile "${DOCKERFILE}")
+          fi
+
           if ! operator-foundry fbc inject-lifecycle \
-            --dockerfile "${DOCKERFILE}" \
             --build-context "${CONTEXT}" \
             --packages "$(cat /shared/packages.txt)" \
             --lifecycle-dir /shared/lifecycle/ \
+            "${INJECT_FLAGS[@]}" \
             "${BUILD_ARG_FLAGS[@]}"; then
 
             # Injection itself failed despite valid packages and lifecycle data being available.

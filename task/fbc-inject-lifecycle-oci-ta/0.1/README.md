@@ -9,6 +9,7 @@ Lifecycle injection is skipped (with a successful result) if not all targeted OC
 |---|---|---|---|
 |CONTEXT|Path to the directory to use as context.|.|false|
 |DOCKERFILE|Path to the Dockerfile to build.|./Dockerfile|false|
+|CATALOG_PATH|Parent catalog directory relative to `CONTEXT` (e.g. `.konflux/catalog`). When set, Dockerfile parsing is skipped for the inject-lifecycle step and `lifecycle.json` is injected into `<CATALOG_PATH>/<package>/` for each package. Use when all COPY instructions targeting `/configs` use `--from=<stage>`. `DOCKERFILE` is still required for eligibility checking and package discovery.|""|false|
 |BUILD_ARGS|The array of --build-arg values ("arg=value" strings), passed to the check-lifecycle-eligibility, get-packages, and inject-lifecycle steps to resolve ARG references used in the Dockerfile's base image tag or in COPY/ADD source paths. Do not use for secrets, values are visible in TaskRun status, pod specs, and logs.|[]|false|
 |SOURCE_ARTIFACT|The Trusted Artifact URI pointing to the artifact with the application source code.||true|
 |ociStorage|The OCI repository where the Trusted Artifacts are stored.||true|
@@ -29,6 +30,21 @@ The task runs four steps in sequence:
 2. **get-packages** — if eligible, parses the `COPY`/`ADD` instructions in the Dockerfile and inspects the catalog subdirectories to determine which OLM packages require lifecycle injection.
 3. **generate-lifecycle** — runs `plcc2fbc` to fetch lifecycle data from PLCC and generate per-package `lifecycle.json` files.
 4. **inject-lifecycle** — injects the generated `lifecycle.json` files into the catalog source directories and writes the `TEST_OUTPUT` result.
+
+### Using CATALOG_PATH
+
+Set `CATALOG_PATH` when the FBC Dockerfile copies catalog content from a builder stage into `/configs`, making the source directory inaccessible on local disk. For example:
+
+```dockerfile
+FROM base AS builder
+RUN generate-catalog --output /configs/my-operator
+FROM base
+COPY --from=builder /configs /configs
+```
+
+In this case, set `CATALOG_PATH` to the local directory that mirrors the catalog content (e.g. `.konflux/catalog`). The `inject-lifecycle` step will inject `lifecycle.json` into `<CATALOG_PATH>/<package>/` for each package, bypassing Dockerfile parsing.
+
+`DOCKERFILE` must still be provided: it is used by `check-lifecycle-eligibility` (reads the base image label) and `get-packages` (extracts package names from COPY destination paths).
 
 ### OCP Version Requirement
 Lifecycle injection only runs if **all** targeted OCP versions in the Dockerfile are >= 5.0. If any version is below 5.0, the component is not eligible, and the task exits successfully with no packages injected.
