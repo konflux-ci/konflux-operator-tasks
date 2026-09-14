@@ -4,6 +4,10 @@
 
 Tekton task catalog for Konflux CI. Tasks live under `task/<name>/<version>/`.
 
+## Issue tracking
+
+Work is tracked in Jira, not GitHub Issues. PR titles follow the format `type(JIRA-ID): description` (e.g., `feat(CLOUDDST-32936): deprecate validate-fbc 0.1 and 0.2`). A Jira ticket reference in the PR title constitutes valid work authorization — do not flag PRs as missing a linked issue when a Jira ID is present.
+
 ## Testing
 
 Every change to a task **must** include or update tests. Two testing layers exist:
