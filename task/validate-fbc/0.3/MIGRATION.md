@@ -2,8 +2,9 @@
 
 ## What Changed
 
-No functional changes were made to `validate-fbc` itself. This version bump
-is used to automatically inject the new `fbc-inject-lifecycle-oci-ta` task
+This version adds a new `check-related-images-mediatype` validation step
+that verifies related images use Docker V2 manifest media types for OCP < 4.20.
+It also triggers the automated rollout of the `fbc-inject-lifecycle-oci-ta` task
 into FBC builder pipelines via MintMaker.
 
 ## What the Migration Script Does
