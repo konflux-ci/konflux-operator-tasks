@@ -249,6 +249,7 @@ spec:
 
         status=0
         OCP_VER_FROM_BASE=$(get_ocp_version_from_fbc_fragment "$image_with_digest") || status=$?
+        echo -n "${OCP_VER_FROM_BASE}" > /shared/ocp-version
         if [ $status -ne 0 ]; then
           echo "!FAILURE! - Could not get OCP version. See https://konflux-ci.dev/architecture/ADR/0026-specifying-ocp-targets-for-fbc.html for defining the parent image."
           note="Step extract-and-validate failed: Could not get the OCP version from the base.  For details, check Tekton task logs."
@@ -543,6 +544,44 @@ spec:
           echo -n "${TEST_OUTPUT}" | tee "$(results.TEST_OUTPUT.path)"
         fi
         popd
+    - name: check-related-images-mediatype
+      image: quay.io/konflux-ci/operator-foundry:0.1@sha256:c9391e9279731f05564d76d62218839c51bb6632137662c58cc4690e5da3090b
+      computeResources:
+        limits:
+          memory: 1Gi
+        requests:
+          memory: 1Gi
+          cpu: 100m
+      script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        prev_result=$(jq -r .result "$(results.TEST_OUTPUT.path)" 2>/dev/null || echo "")
+        if [[ "$prev_result" != "SUCCESS" ]]; then
+          echo "Validation failed in previous step. Skipping mediatype check."
+          echo "For details, check Tekton task result TEST_OUTPUT in the extract-and-validate step."
+          exit 0
+        fi
+
+        if [ ! -f /shared/ocp-version ]; then
+          echo "OCP version not available. Skipping mediatype check."
+          echo "For details, check Tekton task log for the extract-and-validate step."
+          exit 0
+        fi
+
+        if [ ! -f /shared/related-images.json ]; then
+          echo "Related images not available. Skipping mediatype check."
+          echo "For details, check Tekton task log for the extract-and-validate step."
+          exit 0
+        fi
+
+        OCP_VERSION=$(cat /shared/ocp-version)
+
+        operator-foundry fbc check-related-images-mediatype \
+          --ocp-version "$OCP_VERSION" \
+          --related-images-json-path /shared/related-images.json \
+          --output "$(results.TEST_OUTPUT.path)"
+
     - name: save-related-images
       computeResources:
         limits:

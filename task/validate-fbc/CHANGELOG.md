@@ -2,6 +2,12 @@
 
 ## 0.3
 
+### Added
+
+- New `check-related-images-mediatype` step that validates related images use
+  Docker V2 manifest media types for OCP versions below 4.20, delegating to
+  `operator-foundry fbc check-related-images-mediatype`.
+
 ### Fixed
 
 - Migration script for `fbc-inject-lifecycle-oci-ta` now resolves the task bundle
