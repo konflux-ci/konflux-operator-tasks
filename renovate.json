@@ -7,8 +7,8 @@
   "customManagers": [
     {
       "customType": "regex",
-      "fileMatch": [
-        "\\.github/workflows/check-task-yamls\\.yaml$"
+      "managerFilePatterns": [
+        "/\\.github/workflows/check-task-yamls\\.yaml$/"
       ],
       "matchStrings": [
         "pipeline_version:\\s+(?<currentValue>v\\d+\\.\\d+\\.\\d+)"
