@@ -44,9 +44,13 @@ spec:
         - name: SOURCE_CODE_DIR
           value: $(workspaces.workspace.path)
       securityContext:
+        allowPrivilegeEscalation: false
         capabilities:
+          drop:
+            - ALL
           add:
             - SETFCAP
+        readOnlyRootFilesystem: true
       script: |
         #!/usr/bin/env bash
         set -euo pipefail
@@ -124,6 +128,9 @@ spec:
 
         echo "${images_processed_template/\[%s]/[$digests_processed_string]}" > /tekton/home/images_processed.txt
 
+      volumeMounts:
+        - mountPath: /tmp
+          name: tmp
     - name: fips-operator-check-step-action
       computeResources:
         limits:
@@ -162,5 +169,8 @@ spec:
           echo "Task was skipped. Exiting"
           exit 0
         fi
+  volumes:
+    - name: tmp
+      emptyDir: {}
   workspaces:
     - name: workspace

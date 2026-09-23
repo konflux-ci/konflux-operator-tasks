@@ -53,6 +53,8 @@ spec:
       description: The Trusted Artifact URI pointing to the artifact with the application source code with generated
         file-based catalog from catalog-template.yml.
   volumes:
+    - name: tmp
+      emptyDir: {}
     - name: workdir
       emptyDir: {}
     - name: trusted-ca
@@ -95,6 +97,11 @@ spec:
           value: $(params.SOURCE_ARTIFACT)
       securityContext:
         runAsUser: 0
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
+        readOnlyRootFilesystem: true
       command: ["/bin/bash", "-c"]
       args:
         - |
@@ -137,6 +144,9 @@ spec:
           echo -n "false" > "$(step.results.skip_create_trusted_artifact.path)"
         - "bash"
         - $(params.OPM_ARGS[*])
+      volumeMounts:
+        - mountPath: /tmp
+          name: tmp
     - name: convert-image-tags-to-digests
       image: quay.io/konflux-ci/konflux-test:v1.5.0@sha256:fbd5ad045b902065990218922aa6f343e8eb5fd039ecd445bc54819b8e968c3e
       computeResources:
@@ -148,6 +158,11 @@ spec:
       workingDir: /var/workdir/source
       securityContext:
         runAsUser: 0
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
+        readOnlyRootFilesystem: true
       env:
         - name: OPM_OUTPUT_PATH_PARAM
           value: $(params.OPM_OUTPUT_PATH)
@@ -288,6 +303,9 @@ spec:
         # Load utilities and run the conversion
         load_utils
         convert_tags_to_digests
+      volumeMounts:
+        - mountPath: /tmp
+          name: tmp
     - name: replace-related-images-pullspec-in-file
       image: quay.io/konflux-ci/konflux-test:v1.5.0@sha256:fbd5ad045b902065990218922aa6f343e8eb5fd039ecd445bc54819b8e968c3e
       computeResources:
@@ -299,6 +317,11 @@ spec:
       workingDir: /var/workdir/source
       securityContext:
         runAsUser: 0
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
+        readOnlyRootFilesystem: true
       env:
         - name: IDMS_PATH_PARAM
           value: $(params.IDMS_PATH)
@@ -328,6 +351,9 @@ spec:
 
           echo "Replacing pullspecs in '${FILE_TO_UPDATE_PULLSPEC_PATH}' using '${IDMS_PATH_PARAM}'."
           replace_mirror_pullspec_with_source "${IDMS_PATH_PARAM}" "${FILE_TO_UPDATE_PULLSPEC_PATH}"
+      volumeMounts:
+        - mountPath: /tmp
+          name: tmp
     - name: create-trusted-artifact
       image: quay.io/konflux-ci/build-trusted-artifacts:latest@sha256:a246cf2267fe6fa68ae8885c6ca4141923edca3ccf9b56838d1ebe369d31b46d
       when:

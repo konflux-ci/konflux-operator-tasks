@@ -41,6 +41,8 @@ spec:
       description: Tekton task test output.
       value: $(steps.fips-operator-check-step-action.results.TEST_OUTPUT)
   volumes:
+    - name: tmp
+      emptyDir: {}
     - name: workdir
       emptyDir: {}
   stepTemplate:
@@ -55,6 +57,9 @@ spec:
         - $(params.SOURCE_ARTIFACT)=/var/workdir/source
     - name: get-unique-related-images
       image: quay.io/konflux-ci/konflux-test:v1.5.7@sha256:b87cecff1a5feee85194b7af0ce6cc507385391d5519816860facd60767d14e6
+      volumeMounts:
+        - mountPath: /tmp
+          name: tmp
       env:
         - name: IMAGE_URL
           value: $(params.image-url)
@@ -148,9 +153,13 @@ spec:
           cpu: "1"
           memory: 12Gi
       securityContext:
+        allowPrivilegeEscalation: false
         capabilities:
           add:
             - SETFCAP
+          drop:
+            - ALL
+        readOnlyRootFilesystem: true
     - name: fips-operator-check-step-action
       params:
         - name: MAX_PARALLEL
