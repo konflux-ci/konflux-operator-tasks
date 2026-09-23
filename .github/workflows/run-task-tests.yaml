@@ -16,6 +16,9 @@ name: Run Task Tests
   merge_group:
     types: [checks_requested]
 
+permissions:
+  contents: read
+
 jobs:
   run-task-tests:
     runs-on: ubuntu-24.04

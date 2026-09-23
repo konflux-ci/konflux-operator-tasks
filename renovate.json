@@ -1,8 +1,21 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "helpers:pinGitHubActionDigests"
+  ],
   "ignorePaths": [
+    ".github/actions/install-tkn/action.yaml",
+    ".github/resources/workspace-template.yaml",
+    ".github/scripts/check_tekton_tasks.sh",
+    ".github/scripts/test_tekton_tasks.sh",
+    ".github/workflows/check-kustomize-build.yaml",
+    ".github/workflows/check-ta.yaml",
     ".github/workflows/check-task-migration.yaml",
-    ".github/workflows/update-shared-ci.yaml"
+    ".github/workflows/checkton.yaml",
+    ".github/workflows/run-task-tests.yaml",
+    ".github/workflows/task-lint.yaml",
+    ".github/workflows/update-shared-ci.yaml",
+    ".github/workflows/versioning.yaml"
   ],
   "customManagers": [
     {
@@ -15,6 +28,16 @@
       ],
       "depNameTemplate": "tektoncd/pipeline",
       "datasourceTemplate": "github-releases"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/task/.+\\.yaml$/"
+      ],
+      "matchStrings": [
+        "image:\\s+(?<depName>[a-zA-Z0-9.\\-_/]+):(?<currentValue>[a-zA-Z0-9.\\-_]+)@(?<currentDigest>sha256:[a-f0-9]+)"
+      ],
+      "datasourceTemplate": "docker"
     }
   ]
 }
