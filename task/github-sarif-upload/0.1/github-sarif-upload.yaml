@@ -62,7 +62,7 @@ spec:
         value: $(params.image-digest)
   steps:
     - name: validate-inputs
-      image: quay.io/konflux-ci/konflux-test:v1.5.0@sha256:fbd5ad045b902065990218922aa6f343e8eb5fd039ecd445bc54819b8e968c3e
+      image: quay.io/konflux-ci/konflux-test:v1.5.8@sha256:ce93e7ff1618deda40a66d90289d8fee1bf1ac151c06f1defd33d2a56dbd2b94
       workingDir: /var/workdir
       script: |
         #!/usr/bin/env bash
@@ -152,7 +152,7 @@ spec:
         done
 
     - name: upload-sarif
-      image: quay.io/konflux-ci/konflux-test:v1.5.0@sha256:fbd5ad045b902065990218922aa6f343e8eb5fd039ecd445bc54819b8e968c3e
+      image: quay.io/konflux-ci/konflux-test:v1.5.8@sha256:ce93e7ff1618deda40a66d90289d8fee1bf1ac151c06f1defd33d2a56dbd2b94
       workingDir: /var/workdir
       script: |
         #!/usr/bin/env bash
