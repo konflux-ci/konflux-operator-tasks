@@ -1,0 +1,24 @@
+# Changelog
+
+## Unreleased
+
+### Fixed
+
+- Bumped the `konflux-test` image to `v1.5.7`.
+- Updated the `fips-operator-check-step-action` revision parameter to `006b00e`.
+- Updated the `fips-operator-check-step-action` revision parameter to use `check-payload` release `0.3.17`.
+- Updated the `fips-operator-check-step-action` revision parameter to use `check-payload` release `0.3.15`.
+- Updated the `fips-operator-check-step-action` revision parameter to use `check-payload` release `0.3.14`.
+
+## 0.1
+
+### Added
+
+- Initial version of `fips-operator-bundle-check` task
+- Single operator bundle FIPS checking with `check-payload`
+- Scans relatedImages from the operator bundle image
+- Expects an image digest mirror set at `.tekton/images-mirror-set.yaml` when mirroring is required
+
+### Note
+
+Workspace-source variant; the Trusted Artifacts equivalent is `fips-operator-bundle-check-oci-ta`.

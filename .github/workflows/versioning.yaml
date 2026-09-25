@@ -1,0 +1,34 @@
+# yamllint disable-file
+
+# <TEMPLATED FILE!>
+# This file comes from the templates at https://github.com/konflux-ci/task-repo-shared-ci.
+# Please consider sending a PR upstream instead of editing the file directly.
+# See the SHARED-CI.md document in this repo for more details.
+
+name: Check versioning
+'on':
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  check:
+    name: Check versioning
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Check versioning
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+        run: |
+          #!/bin/bash
+          set -euo pipefail
+
+          if ! hack/versioning.py check --base-ref "$BASE_REF"; then
+            echo "To see the errors/warnings inline, go to the 'Files changed' view or the 'Commits' view."
+            exit 1
+          fi
