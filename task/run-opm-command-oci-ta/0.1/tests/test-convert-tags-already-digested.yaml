@@ -43,7 +43,7 @@ spec:
               readOnly: true
         steps:
           - name: create-catalog-with-digests
-            image: quay.io/konflux-ci/task-runner:1.7.0@sha256:1c0582a85dae0949f3ec94aca95695c5d7698b371f1b76c5a78822a6249073dc
+            image: quay.io/konflux-ci/task-runner:3.2.0@sha256:ba5789d2bc04146431e492083c67b86de26d5b17891dc27f67db850a397b66d3
             script: |
               #!/usr/bin/env bash
               set -euo pipefail
@@ -136,7 +136,7 @@ spec:
               - use
               - $(params.SOURCE_ARTIFACT)=$(workspaces.tests-workspace.path)/output
           - name: verify-images-still-digested
-            image: quay.io/konflux-ci/task-runner:1.7.0@sha256:1c0582a85dae0949f3ec94aca95695c5d7698b371f1b76c5a78822a6249073dc
+            image: quay.io/konflux-ci/task-runner:3.2.0@sha256:ba5789d2bc04146431e492083c67b86de26d5b17891dc27f67db850a397b66d3
             script: |
               #!/usr/bin/env bash
               set -euo pipefail
