@@ -31,6 +31,8 @@ spec:
       emptyDir: {}
     - name: workdir
       emptyDir: {}
+    - name: tmp
+      emptyDir: {}
   stepTemplate:
     env:
       - name: IMAGE_URL
@@ -52,9 +54,13 @@ spec:
       workingDir: /shared
       securityContext:
         runAsUser: 0
+        allowPrivilegeEscalation: false
         capabilities:
+          drop:
+            - ALL
           add:
             - SETFCAP
+        readOnlyRootFilesystem: true
       computeResources:
         limits:
           memory: 2Gi
@@ -71,6 +77,9 @@ spec:
           echo "Failed to pull catalog for ${IMAGE_URL} from registry"
           exit 1
         fi
+      volumeMounts:
+        - mountPath: /tmp
+          name: tmp
     - name: run-pruning-check
       image: quay.io/konflux-ci/konflux-test:v1.5.0@sha256:fbd5ad045b902065990218922aa6f343e8eb5fd039ecd445bc54819b8e968c3e
       # per https://kubernetes.io/docs/concepts/containers/images/#imagepullpolicy-defaulting
@@ -78,9 +87,16 @@ spec:
       workingDir: /var/workdir
       securityContext:
         runAsUser: 0
+        allowPrivilegeEscalation: false
         capabilities:
+          drop:
+            - ALL
           add:
             - SETFCAP
+        readOnlyRootFilesystem: true
+      env:
+        - name: HOME
+          value: /tmp
       computeResources:
         limits:
           memory: 10Gi
@@ -253,3 +269,6 @@ spec:
 
         digests_processed_string=$(IFS=,; echo "${digests_processed[*]}")
         echo "${images_processed_template/\[%s]/[$digests_processed_string]}" | tee "$(results.IMAGES_PROCESSED.path)"
+      volumeMounts:
+        - mountPath: /tmp
+          name: tmp

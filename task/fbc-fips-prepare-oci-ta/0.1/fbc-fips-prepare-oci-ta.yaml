@@ -47,6 +47,8 @@ spec:
       description: Total number of unique images
       type: string
   volumes:
+    - name: tmp
+      emptyDir: {}
     - name: workdir
       emptyDir: {}
   stepTemplate:
@@ -63,6 +65,8 @@ spec:
     - name: get-unique-related-images
       image: quay.io/konflux-ci/konflux-test:v1.5.7@sha256:b87cecff1a5feee85194b7af0ce6cc507385391d5519816860facd60767d14e6
       env:
+        - name: HOME
+          value: /tmp
         - name: IMAGE_URL
           value: $(params.image-url)
         - name: IMAGE_DIGEST
@@ -285,10 +289,17 @@ spec:
           cpu: "1"
           memory: 12Gi
       securityContext:
+        allowPrivilegeEscalation: false
         capabilities:
+          drop:
+            - ALL
           add:
             - SETFCAP
+        readOnlyRootFilesystem: true
 
+      volumeMounts:
+        - mountPath: /tmp
+          name: tmp
     - name: split-into-buckets
       image: quay.io/konflux-ci/konflux-test:v1.5.7@sha256:b87cecff1a5feee85194b7af0ce6cc507385391d5519816860facd60767d14e6
       env:
