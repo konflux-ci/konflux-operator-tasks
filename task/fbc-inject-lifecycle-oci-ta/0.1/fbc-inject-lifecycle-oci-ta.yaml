@@ -170,7 +170,7 @@ spec:
           echo "[INFO] Packages to inject lifecycle for: $(cat /shared/packages.txt)"
         fi
     - name: generate-lifecycle
-      image: quay.io/konflux-ci/fbc-update-planner:0.1.0@sha256:756516302435356d73911a79e2de2ef20a8adf4296009c5aa2b521563e1610dd
+      image: quay.io/konflux-ci/fbc-update-planner:0.1.0@sha256:ba1a496aefd9664b551e168d2c4e165e3bc6442887a8c66b5913084d59196b6f
       computeResources:
         requests:
           memory: 256Mi
