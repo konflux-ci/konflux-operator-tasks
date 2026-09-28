@@ -42,6 +42,10 @@ spec:
       emptyDir: {}
     - name: workdir
       emptyDir: {}
+    - name: tmp
+      emptyDir: {}
+    - name: extracted-base-img
+      emptyDir: {}
   stepTemplate:
     env:
       - name: IMAGE_URL
@@ -75,9 +79,16 @@ spec:
       workingDir: /var/workdir/inspect-image
       securityContext:
         runAsUser: 0
+        allowPrivilegeEscalation: false
         capabilities:
+          drop:
+            - ALL
           add:
             - SETFCAP
+        readOnlyRootFilesystem: true
+      env:
+        - name: HOME
+          value: /tmp
       script: |
         #!/usr/bin/env bash
         set -euo pipefail
@@ -187,6 +198,9 @@ spec:
           echo "${TEST_OUTPUT}" | tee "$(results.TEST_OUTPUT.path)"
           exit 0
         fi
+      volumeMounts:
+        - mountPath: /tmp
+          name: tmp
     - name: extract-and-validate
       image: quay.io/konflux-ci/konflux-test:v1.5.0@sha256:fbd5ad045b902065990218922aa6f343e8eb5fd039ecd445bc54819b8e968c3e
       # per https://kubernetes.io/docs/concepts/containers/images/#imagepullpolicy-defaulting
@@ -194,9 +208,16 @@ spec:
       workingDir: /var/workdir/extract-and-validate
       securityContext:
         runAsUser: 0
+        allowPrivilegeEscalation: false
         capabilities:
+          drop:
+            - ALL
           add:
             - SETFCAP
+        readOnlyRootFilesystem: true
+      env:
+        - name: HOME
+          value: /tmp
       computeResources:
         limits:
           memory: 10Gi
@@ -303,7 +324,7 @@ spec:
         fi
 
         EXTRACT_DIR="/extracted_base_img"
-        mkdir "${EXTRACT_DIR}"
+        mkdir -p "${EXTRACT_DIR}"
         if ! retry oc image extract "${base_image_with_digest}" --path /:"${EXTRACT_DIR}"; then
           echo "Unable to extract opm binary"
           note="Step extract-and-validate failed: Failed to extract base image with oc extract command, so it cannot validate extracted binaries.  For details, check Tekton task log."
@@ -543,6 +564,11 @@ spec:
           echo -n "${TEST_OUTPUT}" | tee "$(results.TEST_OUTPUT.path)"
         fi
         popd
+      volumeMounts:
+        - mountPath: /tmp
+          name: tmp
+        - mountPath: /extracted_base_img
+          name: extracted-base-img
     - name: save-related-images
       computeResources:
         limits:

@@ -37,6 +37,8 @@ spec:
           memory: 12Gi
           cpu: '1'
       env:
+        - name: HOME
+          value: /tmp
         - name: IMAGE_URL
           value: $(params.image-url)
         - name: IMAGE_DIGEST
@@ -44,9 +46,16 @@ spec:
         - name: SOURCE_CODE_DIR
           value: $(workspaces.workspace.path)
       securityContext:
+        allowPrivilegeEscalation: false
         capabilities:
+          drop:
+            - ALL
           add:
             - SETFCAP
+        readOnlyRootFilesystem: true
+      volumeMounts:
+        - mountPath: /tmp
+          name: tmp
       script: |
         #!/usr/bin/env bash
         set -euo pipefail
@@ -123,7 +132,6 @@ spec:
         digests_processed_string=$(IFS=,; echo "${digests_processed[*]}")
 
         echo "${images_processed_template/\[%s]/[$digests_processed_string]}" > /tekton/home/images_processed.txt
-
     - name: fips-operator-check-step-action
       computeResources:
         limits:
@@ -164,3 +172,6 @@ spec:
         fi
   workspaces:
     - name: workspace
+  volumes:
+    - name: tmp
+      emptyDir: {}
