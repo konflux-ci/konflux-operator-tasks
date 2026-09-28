@@ -27,6 +27,8 @@ spec:
       value: $(steps.fips-operator-check-step-action.results.TEST_OUTPUT)
     - name: IMAGES_PROCESSED
       description: Images processed in the task.
+  workspaces:
+    - name: workspace
   steps:
     - name: get-unique-related-images
       image: quay.io/konflux-ci/konflux-test:v1.5.7@sha256:b87cecff1a5feee85194b7af0ce6cc507385391d5519816860facd60767d14e6
@@ -162,5 +164,3 @@ spec:
           echo "Task was skipped. Exiting"
           exit 0
         fi
-  workspaces:
-    - name: workspace
