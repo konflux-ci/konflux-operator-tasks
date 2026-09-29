@@ -15,9 +15,10 @@ spec:
     determines the target OLM packages from the Dockerfile, generates
     lifecycle JSON files using plcc2fbc, and injects them into the
     catalog source directories. If the component is not eligible, the task
-    succeeds without performing injection. If the component is eligible,
-    any failure to find packages, generate lifecycle data, or inject it
-    results in task failure.
+    succeeds without performing injection. If all discovered packages are
+    on the internal skip list, the task exits successfully without injection.
+    If the component is eligible, any failure to find packages, generate
+    lifecycle data, or inject it results in task failure.
   params:
     - default: .
       description: Path to the directory to use as context.
@@ -97,7 +98,7 @@ spec:
         - use
         - $(params.SOURCE_ARTIFACT)=/var/workdir/source
     - name: check-lifecycle-eligibility
-      image: quay.io/konflux-ci/operator-foundry:0.1@sha256:333fd99341f971adb921b8ec9c8780329eff7e3869dd32460d472f1b952c086f
+      image: quay.io/konflux-ci/operator-foundry:0.1@sha256:3d7c066a0bd46421b2e3dced9d9c7d5ce3891ea5bf88ccbfe19770c3413f9146
       computeResources:
         requests:
           memory: 64Mi
@@ -130,7 +131,7 @@ spec:
 
         echo "[INFO] Component eligible for lifecycle injection (targets OCP 5.0+): $(cat /shared/eligible)"
     - name: get-packages
-      image: quay.io/konflux-ci/operator-foundry:0.1@sha256:333fd99341f971adb921b8ec9c8780329eff7e3869dd32460d472f1b952c086f
+      image: quay.io/konflux-ci/operator-foundry:0.1@sha256:3d7c066a0bd46421b2e3dced9d9c7d5ce3891ea5bf88ccbfe19770c3413f9146
       computeResources:
         requests:
           memory: 64Mi
@@ -160,10 +161,20 @@ spec:
           BUILD_ARG_FLAGS+=(--build-arg "${build_arg}")
         done
 
+        # Packages to skip during lifecycle injection.
+        # There is an ongoing data remediation effort under PLMCORE-16364
+        # (https://redhat.atlassian.net/browse/PLMCORE-16364). Packages that
+        # are not yet fixed are exempt from this task until their data is
+        # corrected.
+        # Remove entries once data remediation in PLMCORE-16364 is complete and validated.
+        SKIP_PACKAGES="servicemeshoperator3,ocs-tls-profiles,odf-external-snapshotter-operator,odr-volsync-plugin-operator,kubevirt-hyperconverged"
+
         operator-foundry fbc get-packages \
           --dockerfile "${DOCKERFILE}" \
           --build-context "${CONTEXT}" \
           "${BUILD_ARG_FLAGS[@]}" \
+          --skip-packages "${SKIP_PACKAGES}" \
+          --all-filtered-marker /shared/all_packages_skipped \
           --output /shared/packages.txt
 
         if [[ ! -s /shared/packages.txt ]]; then
@@ -194,7 +205,7 @@ spec:
 
         plcc2fbc --validators none --package "$(cat /shared/packages.txt)" --split /shared/lifecycle/
     - name: inject-lifecycle
-      image: quay.io/konflux-ci/operator-foundry:0.1@sha256:333fd99341f971adb921b8ec9c8780329eff7e3869dd32460d472f1b952c086f
+      image: quay.io/konflux-ci/operator-foundry:0.1@sha256:3d7c066a0bd46421b2e3dced9d9c7d5ce3891ea5bf88ccbfe19770c3413f9146
       computeResources:
         requests:
           memory: 64Mi
@@ -276,6 +287,15 @@ spec:
             echo "[ERROR] get-packages step failed with exit code $GET_EXIT_CODE." >&2
             note="Task $(context.task.name) failed: get-packages errors. Check logs."
             operator-foundry make-result-json --result FAILURE --failures 1 --note "${note}" \
+              > "$(results.TEST_OUTPUT.path)"
+            echo -n "true" > "$(step.results.skip_create_trusted_artifact.path)"
+            exit 0
+          fi
+
+          if [[ -f /shared/all_packages_skipped ]]; then
+            echo "[INFO] All discovered packages are on the skip list; no-op success."
+            note="Task $(context.task.name) completed: All packages filtered by skip list."
+            operator-foundry make-result-json --result SUCCESS --successes 0 --note "${note}" \
               > "$(results.TEST_OUTPUT.path)"
             echo -n "true" > "$(step.results.skip_create_trusted_artifact.path)"
             exit 0

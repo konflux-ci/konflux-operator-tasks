@@ -33,10 +33,23 @@
       - INPUT_DIR=catalog/v5.0
 ```
 
+- Added a built-in `SKIP_PACKAGES` list to the `get-packages` step, passed via
+  the `--skip-packages` and `--all-filtered-marker` flags. Packages on this
+  list are excluded from lifecycle injection. When every discovered package is
+  on the skip list, the task writes the `all_packages_skipped` marker and exits
+  with a SUCCESS result (0 successes). The skip list is an internal operational
+  control managed via task releases (not a user-configurable parameter), tied
+  to the PLMCORE-16364 data remediation effort.
+
 ### Changed
 
 - Bumped the `operator-foundry` image digest to pick up build-arg support in
   `check-lifecycle-eligibility`, `get-packages`, and `inject-lifecycle`.
+
+- Bumped the `operator-foundry` image digest to
+  `sha256:3d7c066a0bd46421b2e3dced9d9c7d5ce3891ea5bf88ccbfe19770c3413f9146`
+  for `--skip-packages` and `--all-filtered-marker` flag support in
+  `get-packages`.
 
 - Bumped the `generate-lifecycle` step image (`quay.io/konflux-ci/fbc-update-planner`)
   to `0.1.0@sha256:756516302435356d73911a79e2de2ef20a8adf4296009c5aa2b521563e1610dd`.

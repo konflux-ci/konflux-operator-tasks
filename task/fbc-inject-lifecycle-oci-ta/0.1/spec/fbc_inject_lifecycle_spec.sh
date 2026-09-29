@@ -27,13 +27,17 @@ if [[ "\$1 \$2" == "fbc inject-lifecycle" ]]; then
     echo "\$*" > "${inject_flags_file}"
     exit 0
 fi
-# make-result-json: parse --result VALUE and echo matching JSON
+# make-result-json: parse --result VALUE and --successes VALUE, echo matching JSON
 result="SUCCESS"
+successes=1
 while [[ \$# -gt 0 ]]; do
-    if [[ "\$1" == "--result" ]]; then result="\$2"; fi
+    case "\$1" in
+        --result)    result="\$2"; shift ;;
+        --successes) successes="\$2"; shift ;;
+    esac
     shift
 done
-echo "{\"result\":\"\${result}\",\"successes\":1}"
+echo "{\"result\":\"\${result}\",\"successes\":\${successes}}"
 MOCK_EOF
 chmod +x "${fake_bin}/operator-foundry"
 export PATH="${fake_bin}:${PATH}"
@@ -65,7 +69,7 @@ inject_script="$(extract_inject_script)"
 cleanup+=("${inject_script}")
 
 setup() {
-    rm -f "${results_dir}"/* "${inject_flags_file}"
+    rm -f "${results_dir}"/* "${inject_flags_file}" "${shared_dir}/all_packages_skipped"
 
     echo "0" > "${tekton_steps_dir}/step-check-lifecycle-eligibility/exitCode"
     echo "true" > "${shared_dir}/eligible"
@@ -118,6 +122,21 @@ Describe "inject-lifecycle step: eligibility check failures"
         When call bash "${inject_script}"
         The status should be success
         The contents of file "${results_dir}/TEST_OUTPUT" should include "SUCCESS"
+        The contents of file "${results_dir}/skip_create_trusted_artifact" should equal "true"
+        The file "${inject_flags_file}" should not be exist
+    End
+End
+
+Describe "inject-lifecycle step: all packages skipped"
+    BeforeEach setup
+
+    It "reports SUCCESS with 0 successes when all_packages_skipped marker exists"
+        touch "${shared_dir}/all_packages_skipped"
+        > "${shared_dir}/packages.txt"
+        When call bash "${inject_script}"
+        The status should be success
+        The contents of file "${results_dir}/TEST_OUTPUT" should include "SUCCESS"
+        The contents of file "${results_dir}/TEST_OUTPUT" should include '"successes":0'
         The contents of file "${results_dir}/skip_create_trusted_artifact" should equal "true"
         The file "${inject_flags_file}" should not be exist
     End
