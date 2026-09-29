@@ -46,6 +46,8 @@ spec:
         limits:
           memory: 6Gi
       env:
+        - name: HOME
+          value: /tmp
         - name: IMAGE_URL
           value: $(params.image-url)
         - name: IMAGE_DIGEST
@@ -55,9 +57,16 @@ spec:
         - name: IMAGE_MIRROR_SET_PATH
           value: $(params.image-mirror-set-path)
       securityContext:
+        allowPrivilegeEscalation: false
         capabilities:
+          drop:
+            - ALL
           add:
             - SETFCAP
+        readOnlyRootFilesystem: true
+      volumeMounts:
+        - mountPath: /tmp
+          name: tmp
       script: |
         #!/usr/bin/env bash
         set -euo pipefail
@@ -342,3 +351,6 @@ spec:
         fi
   workspaces:
     - name: workspace
+  volumes:
+    - name: tmp
+      emptyDir: {}
