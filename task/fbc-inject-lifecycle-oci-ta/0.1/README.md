@@ -57,8 +57,9 @@ The task writes a `TEST_OUTPUT` result following the Konflux convention, allowin
 
 - the eligibility check fails to produce output,
 - package discovery (`get-packages`) errors out,
-- the component is eligible but no packages requiring lifecycle injection are found,
 - `plcc2fbc` fails or cannot generate lifecycle data for all requested packages, or
 - lifecycle injection itself fails.
 
 A `SUCCESS` result is written if the component is not eligible for lifecycle injection.
+
+A `SUCCESS` result with 0 successes is also written when all discovered packages are filtered by the built-in skip list (no injection performed).

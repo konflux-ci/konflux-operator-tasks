@@ -13,9 +13,19 @@
   `get-packages` steps; `CATALOG_PATH` and `DOCKERFILE` are mutually exclusive
   only at the inject step.
 
-- Bumped the `operator-foundry` image digest to pick up `--catalog-path`
-  support in `inject-lifecycle`
-  (`quay.io/konflux-ci/operator-foundry:0.1@sha256:333fd99341f971adb921b8ec9c8780329eff7e3869dd32460d472f1b952c086f`).
+- Added a built-in `SKIP_PACKAGES` list passed via `--skip-packages` to
+  `operator-foundry` in the `get-packages` step. When all discovered packages
+  are on the skip list, the resulting `packages.txt` is empty and the
+  `inject-lifecycle` step treats it as a no-op success (0 successes, 0
+  failures). More broadly, the `inject-lifecycle` step now treats _any_ empty
+  `packages.txt` as a success rather than a failure. This is safe because the
+  step runs under `set -euo pipefail`: the only way `packages.txt` can be empty
+  is when every discovered package was filtered by the skip list.  The case
+  where no packages are discoverable at all never reaches `inject-lifecycle` —
+  `operator-foundry get-packages` errors out and `set -e` terminates the
+  `get-packages` step, which is reported as a `FAILURE` via `TEST_OUTPUT`. The
+  skip list is an internal operational control managed via task releases (not
+  user-configurable), tied to the PLMCORE-16364 data remediation effort.
 
 - Added optional `BUILD_ARGS` param, passed as `--build-arg` flags to the
   `check-lifecycle-eligibility`, `get-packages`, and `inject-lifecycle` steps,
@@ -35,8 +45,9 @@
 
 ### Changed
 
-- Bumped the `operator-foundry` image digest to pick up build-arg support in
-  `check-lifecycle-eligibility`, `get-packages`, and `inject-lifecycle`.
+- Bumped the `operator-foundry` image digest to
+  `sha256:3d7c066a0bd46421b2e3dced9d9c7d5ce3891ea5bf88ccbfe19770c3413f9146`
+  (adds `--catalog-path`, build-arg, and `--skip-packages` support).
 
 - Bumped the `generate-lifecycle` step image (`quay.io/konflux-ci/fbc-update-planner`)
   to `0.1.0@sha256:756516302435356d73911a79e2de2ef20a8adf4296009c5aa2b521563e1610dd`.
