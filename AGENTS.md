@@ -76,3 +76,24 @@ Other `*-oci-ta` tasks are **standalone** — they have no base task and no `rec
 ## CI checks
 
 YAML lint, Checkton, ShellSpec, Tekton integration tests, Go tests (task-generator), and migration validation all run on PRs. Check `.github/workflows/` for details.
+
+## Local CI customizations (cruft template overrides)
+
+This repo syncs CI workflows and scripts from the [task-repo-shared-ci](https://github.com/konflux-ci/task-repo-shared-ci) template via [cruft](https://cruft.github.io/cruft/). Files marked with `<TEMPLATED FILE!>` come from the template. Some of these files have **local customizations** that intentionally diverge from the template and **must be preserved** when resolving `.rej` conflicts during cruft updates.
+
+### Inventory of local customizations
+
+| File | Customization | Reason |
+|------|--------------|--------|
+| `.github/workflows/checkton.yaml` | `exclude-regex: ^task-generator` parameter in the Checkton step | `task-generator/` contains golden fixture YAML files with embedded shell snippets that are not meant for ShellCheck lint. Without this exclusion, Checkton reports false positives on test fixtures. |
+
+When adding a new local customization to a templated file, add a row to the table above with the file, the specific change, and the reason it is needed. If the customization can be upstreamed to `task-repo-shared-ci` instead, prefer that to reduce drift.
+
+### Reviewing cruft-update PRs
+
+When reviewing a PR that syncs with the cruft template (typically titled `chore: update shared CI files` or opened by the shared-CI updater workflow), especially when it contains `.rej` files requiring manual conflict resolution:
+
+1. **Check every file in this inventory.** For each row in the table above, verify that the listed customization is still present in the resolved file. A cruft update that overwrites a templated file will drop local customizations silently.
+2. **Search for `<TEMPLATED FILE!>` in changed files.** Any modified file with this header is template-managed and could have had local customizations dropped.
+3. **Do not assume "syncing with upstream" means all changes are safe.** Conflict resolution can silently remove intentional local divergences. Each customization in the inventory exists for a documented reason.
+4. **Update this inventory** if the cruft update intentionally adds or removes a local customization.
