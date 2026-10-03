@@ -38,7 +38,7 @@ spec:
       description: Images processed in the task.
   steps:
     - name: get-unique-related-images
-      image: quay.io/konflux-ci/konflux-test:v1.5.7@sha256:b87cecff1a5feee85194b7af0ce6cc507385391d5519816860facd60767d14e6
+      image: quay.io/konflux-ci/konflux-test:v1.5.9@sha256:7faaebc542c61704003fecbab81a9c81c9770b4df8c5bba18459fba3f58e9c51
       computeResources:
         requests:
           memory: 6Gi
@@ -323,12 +323,12 @@ spec:
           - name: url
             value: https://github.com/konflux-ci/konflux-operator-tasks
           - name: revision
-            value: 006b00e06b6916235ea5c0eb6511dd29371cd682
+            value: c0705183d4fa1df643ba6c306c66e6f2c0276e40
           - name: pathInRepo
             value: stepactions/fips-operator-check-step-action/0.1/fips-operator-check-step-action.yaml
 
     - name: parse-images-processed-result
-      image: quay.io/konflux-ci/konflux-test:v1.5.7@sha256:b87cecff1a5feee85194b7af0ce6cc507385391d5519816860facd60767d14e6
+      image: quay.io/konflux-ci/konflux-test:v1.5.9@sha256:7faaebc542c61704003fecbab81a9c81c9770b4df8c5bba18459fba3f58e9c51
       computeResources:
         requests:
           memory: 64Mi
