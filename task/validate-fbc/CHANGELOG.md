@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Removed
+
+- Removed deprecated 0.1 and 0.2 task versions, Tekton pipelines, and migration scripts.
+
 ## 0.3
 
 ### Fixed
