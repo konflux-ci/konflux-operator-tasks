@@ -48,7 +48,7 @@ task/<name>/
 
 ## Multi-version task consistency
 
-Some tasks have multiple version directories (e.g., `task/validate-fbc/0.1/` and `0.2/`). When modifying a task that has more than one version:
+Some tasks have multiple version directories (e.g., `task/foo/0.1/` and `0.2/`). When modifying a task that has more than one version:
 
 1. **Check for other versions.** List the version directories under `task/<name>/` before making changes.
 2. **Propagate changes to all versions** unless there is a documented reason for divergence. If a newer version's `CHANGELOG.md` states "no functional changes," it should mirror the older version's logic.
