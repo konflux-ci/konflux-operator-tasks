@@ -18,7 +18,7 @@ command -v go &> /dev/null || { echo Please install golang to run this tool; exi
 
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 TASK_DIR="$(realpath "${ROOT_DIR}/task")"
-: "${TRUSTED_ARTIFACTS=github.com/konflux-ci/task-repo-shared-ci/ta-generator@v1.0.0}"
+: "${TRUSTED_ARTIFACTS=github.com/konflux-ci/task-repo-shared-ci/ta-generator@v1.1.0}"
 
 tashdir="$(mktemp -d)"
 trap 'rm -rf "${tashdir}"' EXIT
