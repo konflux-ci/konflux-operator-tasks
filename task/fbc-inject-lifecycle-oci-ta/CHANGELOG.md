@@ -4,6 +4,10 @@
 
 ### Added
 
+- Added `pf-status-relay-operator` to the built-in `SKIP_PACKAGES` list. This
+  operator is a Tech Preview operator that requires an exception in the
+  Konflux pipeline (PLMCORE-17472).
+
 - Added optional `CATALOG_PATH` param (default `""`). When set, Dockerfile
   parsing is skipped for the `inject-lifecycle` step and `lifecycle.json` is
   injected directly into `<CATALOG_PATH>/<package>/` for each package. Intended
