@@ -41,7 +41,7 @@ spec:
         name: workdir
   steps:
     - name: use-buckets-artifact
-      image: quay.io/konflux-ci/build-trusted-artifacts:latest@sha256:a246cf2267fe6fa68ae8885c6ca4141923edca3ccf9b56838d1ebe369d31b46d
+      image: quay.io/konflux-ci/build-trusted-artifacts:latest@sha256:c65974637252678fda561c7e2014e1e239aba9a8cd52f58c4a494034b311a015
       args:
         - use
         - $(params.BUCKETS_ARTIFACT)=/var/workdir/buckets
