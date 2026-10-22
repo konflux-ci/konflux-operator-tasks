@@ -4,6 +4,10 @@
 
 ### Added
 
+- Added `model-validation-operator` to the built-in `SKIP_PACKAGES` list. This
+  operator is a Tech Preview operator that requires an exception in the
+  Konflux pipeline (PLMCORE-17472).
+
 - Added `pf-status-relay-operator` to the built-in `SKIP_PACKAGES` list. This
   operator is a Tech Preview operator that requires an exception in the
   Konflux pipeline (PLMCORE-17472).

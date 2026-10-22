@@ -167,7 +167,9 @@ spec:
         # are not yet fixed are exempt from this task until their data is
         # corrected.
         # Remove entries once data remediation in PLMCORE-16364 is complete and validated.
-        SKIP_PACKAGES="servicemeshoperator3,ocs-tls-profiles,odf-external-snapshotter-operator,odr-volsync-plugin-operator,pf-status-relay-operator"
+        # Exceptions for Tech Preview operators are tracked in PLMCORE-17472
+        # (https://redhat.atlassian.net/browse/PLMCORE-17472).
+        SKIP_PACKAGES="servicemeshoperator3,ocs-tls-profiles,odf-external-snapshotter-operator,odr-volsync-plugin-operator,pf-status-relay-operator,model-validation-operator"
 
         operator-foundry fbc get-packages \
           --dockerfile "${DOCKERFILE}" \
