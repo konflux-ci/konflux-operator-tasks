@@ -11,6 +11,9 @@ If that's not something you ever plan to do, consider removing this section.
 
 ### Added
 
+- Added explicit `computeResources` (requests: cpu=1, memory=3Gi; limits:
+  memory=3Gi) to the `use-trusted-artifact` and `create-trusted-artifact`
+  steps.
 - Added computeResources to all task-specific steps.
 
 ## 0.1

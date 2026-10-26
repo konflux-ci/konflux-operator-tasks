@@ -98,10 +98,10 @@ spec:
         - use
         - $(params.SOURCE_ARTIFACT)=/var/workdir/source
       computeResources:
-        limits:
-          memory: 3Gi
         requests:
           cpu: "1"
+          memory: 3Gi
+        limits:
           memory: 3Gi
     - name: check-lifecycle-eligibility
       image: quay.io/konflux-ci/operator-foundry:0.1@sha256:3d7c066a0bd46421b2e3dced9d9c7d5ce3891ea5bf88ccbfe19770c3413f9146
@@ -361,10 +361,10 @@ spec:
           operator: in
           values: ["false"]
       computeResources:
-        limits:
-          memory: 3Gi
         requests:
           cpu: "1"
+          memory: 3Gi
+        limits:
           memory: 3Gi
       env:
       - name: IMAGE_EXPIRES_AFTER
