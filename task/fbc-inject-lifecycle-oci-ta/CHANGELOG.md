@@ -4,6 +4,10 @@
 
 ### Added
 
+- Added explicit `computeResources` (requests: cpu=1, memory=3Gi; limits:
+  memory=3Gi) to the `use-trusted-artifact` and `create-trusted-artifact`
+  steps.
+
 - Added `model-validation-operator` to the built-in `SKIP_PACKAGES` list. This
   operator is a Tech Preview operator that requires an exception in the
   Konflux pipeline (PLMCORE-17472).

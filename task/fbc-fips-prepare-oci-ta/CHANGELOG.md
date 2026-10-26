@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Added
+
+- Added explicit `computeResources` (requests: cpu=1, memory=3Gi; limits:
+  memory=3Gi) to the `use-trusted-artifact`, `split-into-buckets`, and
+  `create-buckets-artifact` steps.
+
 ### Fixed
 
 - Bumped the `konflux-test` image to `v1.5.9`.

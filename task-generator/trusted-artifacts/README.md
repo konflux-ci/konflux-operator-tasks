@@ -85,6 +85,18 @@ Both regular expression (`regexReplacements`) and string based replacements
  - Task.spec.steps.workingDir
  - Task.spec.steps.script
 
+## Injected defaults
+
+The generator injects the following properties on every `use-trusted-artifact`
+step it synthesizes. These are hardcoded in `ta.go` and are not configurable via
+`recipe.yaml`.
+
+| Property           | Value                          |
+|--------------------|--------------------------------|
+| `computeResources` | requests: cpu=1, memory=3Gi; limits: memory=3Gi |
+| `image`            | `quay.io/konflux-ci/build-trusted-artifacts:latest@sha256:…` (pinned by digest) |
+| `volumeMounts`     | Inherited from `addTAVolumeMount` in `recipe.yaml` (if set) |
+
 ## Testing
 
 There are various included tests in the `golden` folder. 

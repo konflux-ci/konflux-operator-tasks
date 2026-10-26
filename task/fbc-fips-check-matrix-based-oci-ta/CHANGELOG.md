@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Added
+
+- Added explicit `computeResources` (requests: cpu=1, memory=3Gi; limits:
+  memory=3Gi) to the `use-buckets-artifact`, `prepare-bucket-images`, and
+  `output-results` steps.
+
 ### Fixed
 
 - Bumped the `konflux-test` image to `v1.5.9`.
