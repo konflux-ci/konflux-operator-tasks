@@ -97,6 +97,7 @@ spec:
       args:
         - use
         - $(params.SOURCE_ARTIFACT)=/var/workdir/source
+      computeResources: {}
     - name: check-lifecycle-eligibility
       image: quay.io/konflux-ci/operator-foundry:0.1@sha256:3d7c066a0bd46421b2e3dced9d9c7d5ce3891ea5bf88ccbfe19770c3413f9146
       computeResources:
@@ -354,6 +355,7 @@ spec:
         - input: "$(steps.inject-lifecycle.results.skip_create_trusted_artifact)"
           operator: in
           values: ["false"]
+      computeResources: {}
       env:
       - name: IMAGE_EXPIRES_AFTER
         value: $(params.ociArtifactExpiresAfter)

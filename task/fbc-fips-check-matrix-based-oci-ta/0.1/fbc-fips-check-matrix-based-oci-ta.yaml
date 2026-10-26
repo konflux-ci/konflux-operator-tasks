@@ -45,9 +45,11 @@ spec:
       args:
         - use
         - $(params.BUCKETS_ARTIFACT)=/var/workdir/buckets
+      computeResources: {}
 
     - name: prepare-bucket-images
       image: quay.io/konflux-ci/konflux-test:v1.5.9@sha256:7faaebc542c61704003fecbab81a9c81c9770b4df8c5bba18459fba3f58e9c51
+      computeResources: {}
       env:
         - name: BUCKET_INDEX
           value: $(params.BUCKET_INDEX)
@@ -118,6 +120,7 @@ spec:
 
     - name: output-results
       image: quay.io/konflux-ci/konflux-test:v1.5.9@sha256:7faaebc542c61704003fecbab81a9c81c9770b4df8c5bba18459fba3f58e9c51
+      computeResources: {}
       env:
         - name: BUCKET_INDEX
           value: $(params.BUCKET_INDEX)

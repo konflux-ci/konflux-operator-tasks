@@ -78,6 +78,12 @@ spec:
     args:
       - use
       - $(params.SOURCE_ARTIFACT)=/var/workdir/source
+    computeResources:
+      limits:
+        memory: 3Gi
+      requests:
+        cpu: "1"
+        memory: 3Gi
   - image: quay.io/konflux-ci/cachi2:0.17.0@sha256:963870f04aeb4a207e79b8eacb47e16c8faa7451f52e92959e0e16cdbd258fb3
     name: prefetch-dependencies
     env:

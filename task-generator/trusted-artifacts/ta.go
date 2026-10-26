@@ -322,6 +322,15 @@ func perform(task *pipeline.Task, recipe *Recipe) error {
 			Image:        image,
 			Args:         args,
 			VolumeMounts: recipe.AddTAVolumeMount,
+			ComputeResources: core.ResourceRequirements{
+				Requests: core.ResourceList{
+					core.ResourceCPU:    resource.MustParse("1"),
+					core.ResourceMemory: resource.MustParse("3Gi"),
+				},
+				Limits: core.ResourceList{
+					core.ResourceMemory: resource.MustParse("3Gi"),
+				},
+			},
 		}}, task.Spec.Steps...)
 	}
 	if recipe.createSource || recipe.createCachi2 {
