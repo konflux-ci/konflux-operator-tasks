@@ -35,7 +35,12 @@ spec:
     image: quay.io/konflux-ci/konflux-test:v1.4.28@sha256:4a5423e125fc28db800421422d9933290dc4b62a22401d74cd3348c03107a5d9
     # per https://kubernetes.io/docs/concepts/containers/images/#imagepullpolicy-defaulting
     # the cluster will set imagePullPolicy to IfNotPresent
-    computeResources: {}
+    computeResources:
+      limits:
+        memory: 3Gi
+      requests:
+        cpu: "1"
+        memory: 3Gi
     securityContext:
       runAsUser: 0
       capabilities:
