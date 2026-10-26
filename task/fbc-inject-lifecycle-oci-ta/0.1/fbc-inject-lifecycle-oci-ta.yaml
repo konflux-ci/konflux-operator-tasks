@@ -94,15 +94,15 @@ spec:
   steps:
     - name: use-trusted-artifact
       image: quay.io/konflux-ci/build-trusted-artifacts:latest@sha256:3e6dc09d80042c78c0c3bbcb4faf91f493bffc45cdee0978f285a2e57ac8aebb
+      computeResources:
+        requests:
+          memory: 3Gi
+          cpu: "1"
+        limits:
+          memory: 3Gi
       args:
         - use
         - $(params.SOURCE_ARTIFACT)=/var/workdir/source
-      computeResources:
-        requests:
-          cpu: "1"
-          memory: 3Gi
-        limits:
-          memory: 3Gi
     - name: check-lifecycle-eligibility
       image: quay.io/konflux-ci/operator-foundry:0.1@sha256:3d7c066a0bd46421b2e3dced9d9c7d5ce3891ea5bf88ccbfe19770c3413f9146
       computeResources:
@@ -362,8 +362,8 @@ spec:
           values: ["false"]
       computeResources:
         requests:
-          cpu: "1"
           memory: 3Gi
+          cpu: "1"
         limits:
           memory: 3Gi
       env:

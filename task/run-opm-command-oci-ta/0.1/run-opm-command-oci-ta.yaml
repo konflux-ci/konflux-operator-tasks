@@ -75,15 +75,15 @@ spec:
   steps:
     - name: use-trusted-artifact
       image: quay.io/konflux-ci/build-trusted-artifacts:latest@sha256:a246cf2267fe6fa68ae8885c6ca4141923edca3ccf9b56838d1ebe369d31b46d
-      args:
-        - use
-        - $(params.SOURCE_ARTIFACT)=/var/workdir/source
       computeResources:
         limits:
           memory: 3Gi
         requests:
           cpu: "1"
           memory: 3Gi
+      args:
+        - use
+        - $(params.SOURCE_ARTIFACT)=/var/workdir/source
     - name: run-opm-with-user-args
       image: quay.io/konflux-ci/operator-sdk-builder:latest@sha256:2737ff035f3a6d94e189cd31e7653998525c52f4d4db994ba1874a3a74bb4912
       computeResources:
