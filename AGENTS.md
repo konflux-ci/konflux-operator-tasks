@@ -73,6 +73,14 @@ Some `*-oci-ta` tasks are **generated** from base tasks by `task-generator/trust
 
 Other `*-oci-ta` tasks are **standalone** — they have no base task and no `recipe.yaml`. These are authored and edited directly like any other task.
 
+### Sandbox limitations
+
+`hack/generate-ta-tasks.sh` requires network access to resolve container image digests and uses an external generator binary (`task-repo-shared-ci/ta-generator`), not the local `ta.go`. It cannot run in the agent sandbox. When a change to `ta.go` or a base task affects generated OCI-TA tasks (those with `recipe.yaml`):
+
+1. Make the change to the base task or `ta.go` normally
+2. Do NOT hand-edit the generated YAML files — hand-edits will be overwritten and will fail the 'Check Trusted Artifact variants' CI check
+3. Note in the PR description that generated OCI-TA tasks need regeneration by a maintainer after merge
+
 ## CI checks
 
 YAML lint, Checkton, ShellSpec, Tekton integration tests, Go tests (task-generator), and migration validation all run on PRs. Check `.github/workflows/` for details.
