@@ -73,6 +73,16 @@ Some `*-oci-ta` tasks are **generated** from base tasks by `task-generator/trust
 
 Other `*-oci-ta` tasks are **standalone** — they have no base task and no `recipe.yaml`. These are authored and edited directly like any other task.
 
+## Task YAML conventions
+
+### computeResources
+
+- Every step must declare `computeResources` with explicit values — never use empty maps (`computeResources: {}`).
+- Values are task-dependent. Match the workload profile of the step; when adding `computeResources` to an existing file, use values consistent with similar steps in that file.
+- Place `computeResources` immediately after `image:` in the step definition (before `args:`, `env:`, `script:`, etc.)
+- Within `computeResources`, order `limits` before `requests` (this is the dominant pattern in the codebase, used in 21 of 28 existing declarations)
+- Within each sub-block, order `memory` before `cpu`
+
 ## CI checks
 
 YAML lint, Checkton, ShellSpec, Tekton integration tests, Go tests (task-generator), and migration validation all run on PRs. Check `.github/workflows/` for details.
