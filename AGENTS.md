@@ -107,7 +107,7 @@ taskRef:
   resolver: bundles
 ```
 
-This follows a cross-repo design decision documented in the container-build-catalog repository.
+This follows a cross-repo design decision documented in the container-build-catalog repository ([pipeline-bundle-management.md](https://github.com/konflux-ci/container-build-catalog/blob/main/docs/design/pipeline-bundle-management.md)).
 
 ### Dependency update rule
 
@@ -115,7 +115,7 @@ When introducing pinned digests (image tags with `@sha256:...` or bundle refs wi
 
 Currently, the custom managers in `renovate.json` cover:
 
-- `task/**/*.yaml` — Docker image digests (`image: <name>:<tag>@sha256:<digest>`)
+- All YAML files under `task/` (regex `task/.+\.yaml$`) — Docker image digests (`image: <name>:<tag>@sha256:<digest>`)
 - `.github/workflows/check-task-yamls.yaml` — Tekton pipeline version
 
 Files outside these patterns (e.g., `pipelines/**/*.yaml`) require new custom manager entries to enable automated digest updates.
