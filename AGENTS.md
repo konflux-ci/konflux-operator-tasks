@@ -115,7 +115,7 @@ When introducing pinned digests (image tags with `@sha256:...` or bundle refs wi
 
 Currently, the custom managers in `renovate.json` cover:
 
-- `task/*.yaml` — Docker image digests (`image: <name>:<tag>@sha256:<digest>`)
+- `task/**/*.yaml` — Docker image digests (`image: <name>:<tag>@sha256:<digest>`)
 - `.github/workflows/check-task-yamls.yaml` — Tekton pipeline version
 
 Files outside these patterns (e.g., `pipelines/**/*.yaml`) require new custom manager entries to enable automated digest updates.
