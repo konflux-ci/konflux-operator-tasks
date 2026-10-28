@@ -76,3 +76,46 @@ Other `*-oci-ta` tasks are **standalone** — they have no base task and no `rec
 ## CI checks
 
 YAML lint, Checkton, ShellSpec, Tekton integration tests, Go tests (task-generator), and migration validation all run on PRs. Check `.github/workflows/` for details.
+
+## Pipelines
+
+### Directory structure
+
+Pipeline definitions live under `pipelines/<name>/`, each containing the pipeline YAML and a README. Currently only `fbc-builder` exists:
+
+```
+pipelines/<name>/
+├── <name>.yaml          # Tekton Pipeline definition
+└── README.md
+```
+
+### Bundle-ref convention
+
+All task references in pipeline definitions use `resolver: bundles` with digest-pinned bundle references, even for tasks that also reside locally in this repo. Do not use local task references (`taskRef: name: <task>`) in pipeline definitions.
+
+A typical task reference looks like:
+
+```yaml
+taskRef:
+  params:
+  - name: name
+    value: <task-name>
+  - name: bundle
+    value: quay.io/konflux-ci/tekton-catalog/task-<name>:<version>@sha256:<digest>
+  - name: kind
+    value: task
+  resolver: bundles
+```
+
+This follows a cross-repo design decision documented in the container-build-catalog repository.
+
+### Dependency update rule
+
+When introducing pinned digests (image tags with `@sha256:...` or bundle refs with `@sha256:...`) in any YAML file, verify that `renovate.json` has a custom manager entry whose `managerFilePatterns` and `matchStrings` cover the new file path and digest format. If not covered, update `renovate.json` in the same PR to ensure automated dependency updates can reach the new references.
+
+Currently, the custom managers in `renovate.json` cover:
+
+- `task/*.yaml` — Docker image digests (`image: <name>:<tag>@sha256:<digest>`)
+- `.github/workflows/check-task-yamls.yaml` — Tekton pipeline version
+
+Files outside these patterns (e.g., `pipelines/**/*.yaml`) require new custom manager entries to enable automated digest updates.
