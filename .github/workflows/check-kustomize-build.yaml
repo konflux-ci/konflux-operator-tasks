@@ -1,23 +1,36 @@
+# yamllint disable-file
+
+# <TEMPLATED FILE!>
+# This file comes from the templates at https://github.com/konflux-ci/task-repo-shared-ci.
+# Please consider sending a PR upstream instead of editing the file directly.
+# See the SHARED-CI.md document in this repo for more details.
+
 name: Validate PR - kustomize manifests
 'on':
   pull_request:
     branches: [main]
   merge_group:
     types: [checks_requested]
+permissions:
+  contents: read
 jobs:
   kustomize-build:
-    name: Check Kustomize Build of Task and Pipelines
+    name: Check Kustomize Build of Task
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
-        # actions/checkout@v4.4.0
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install oc
         run: |
           set -euo pipefail
-          url=https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/latest-4.17/openshift-client-linux.tar.gz
-          if ! which oc; then
-            curl --fail --no-progress-meter -L "$url" | gzip -cd | sudo -- tar -x -C /usr/bin oc
+          OC_CLIENT_VERSION=4.17.57
+          base_url="https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/${OC_CLIENT_VERSION}"
+          archive=openshift-client-linux.tar.gz
+          OC_CLIENT_CHECKSUM=b4e5b02515dcc1d67aa22d00eaffe8c61efc5afb9e873a3c3301479adc799569
+          if ! command -v oc >/dev/null; then
+            curl -fsSLO "${base_url}/${archive}"
+            echo "${OC_CLIENT_CHECKSUM}  ${archive}" | sha256sum -c -
+            sudo tar -xzf "${archive}" -C /usr/bin oc
           fi
       - name: Validate Manifests
         run: hack/verify-manifests.sh

@@ -6,26 +6,26 @@ name: Check Tasks YAMLs
   merge_group:
     types: [checks_requested]
 
+permissions:
+  contents: read
+
 jobs:
   check:
     runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout repository
-        # actions/checkout@v4.4.0
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
         with:
           fetch-depth: 0
 
       - name: Create k8s Kind Cluster
-        # helm/kind-action@v1.12.0
-        uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3
+        uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3  # v1.12.0
         with:
           cluster_name: kind
 
       - name: Set up Tekton
-        # tektoncd/actions/setup-tektoncd@main
-        uses: tektoncd/actions/setup-tektoncd@2b126ef971bbfda195d8a6c9b7c4eb3bfda452bf
+        uses: tektoncd/actions/setup-tektoncd@2b126ef971bbfda195d8a6c9b7c4eb3bfda452bf  # main
         with:
           pipeline_version: v1.14.0
 

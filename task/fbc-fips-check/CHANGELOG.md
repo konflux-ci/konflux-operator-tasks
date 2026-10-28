@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- Bumped the `konflux-test` image to `v1.5.9`.
+- Updated the `fips-operator-check-step-action` revision parameter to use `check-payload` release `0.4.1`.
 - Bumped the `konflux-test` image to `v1.5.7`.
 - Updated the `fips-operator-check-step-action` revision parameter to `006b00e`.
 - Updated the `fips-operator-check-step-action` revision parameter to use `check-payload` release `0.3.17`.
