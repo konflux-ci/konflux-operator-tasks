@@ -42,6 +42,9 @@ To validate supply chain integrity and ensure reproducible builds, all `olm.bund
 ### Trusted registry for bundle image references
 To validate that bundle images originate from trusted sources, all `olm.bundle` image references must come from `registry.redhat.io` or `registry.stage.redhat.io`. References pointing to any other registry cause a validation failure.
 
+### OCI mediaType compatibility
+For OCP versions below 4.21, related images must use Docker V2 manifest media types rather than OCI media types, since older OCP versions do not support OCI natively. This check inspects the manifest mediaType of each related image and fails if any use OCI-only types on an incompatible OCP version. The check is skipped for OCP > 4.20.
+
 ## Data output
 ### Related images
 
