@@ -8,38 +8,17 @@ The tasks within this repository were migrated from the [Konflux build definitio
 
 ## Structure
 
-This repository is organized into several key directories, each serving a specific purpose for Tekton-related resources.
+This repository is organized into several key directories, each serving a specific purpose for Tekton-related resources:
 
-### Tasks
+- `tasks/`: Contains the Tekton Task definitions used in the operator build and test pipelines.
+- `pipelines/`: Contains the Tekton Pipeline definitions that orchestrate the tasks.
+- `tests/`: Contains test cases and validation scripts for the tasks and pipelines.
+- `docs/`: Contains additional documentation and guides.
 
-The `tasks` directory contains standardized [Tekton tasks](https://tekton.dev/docs/pipelines/tasks/) that are used to run different kinds of verifications for operator container builds.
+## Migration Script Immutability Constraint
 
-#### Adding a New Task
+**Important:** Once a migration script has been executed and its changes have been applied to the repository, the script itself must be treated as immutable. Do not modify, delete, or rename existing migration scripts. If a migration script contains an error or needs to be corrected, create a new migration script to address the issue rather than altering the original. This ensures a clear and auditable history of all changes made to the repository structure and content.
 
-To add a new task, create a `.yaml` file inside the `tasks/<your-task-name>/0.1/` directory. Ensure it follows the Tekton [Task specification](https://tekton.dev/docs/pipelines/tasks/), is well-documented (add `README.md` file), [well-versioned](#-versioning) and includes example usage.
+## Contributing
 
-Refer to the [Building Tekton tasks as bundles in Konflux](https://konflux-ci.dev/docs/end-to-end/building-tekton-tasks/) guide for details on how to onboard the new Tekton tasks to Konflux, enabling their integration into the Konflux build pipelines.
-
-#### Versioning
-
-We follow a **versioning strategy** to ensure updates don’t break existing workflows.
-
-A **new version** of a task should be created **if**:
-
-- The task’s **interface changes** (e.g., parameters, workspaces, or result names are modified).
-- New functionality is introduced that **isn’t backward compatible**.
-- A critical bug fix **requires an updated implementation**.
-
-Each version should be **clearly labeled** to avoid breaking existing pipelines. A `MIGRATION.md` file needs to be supplied containing instructions for migrating to the new version of the task.
-
-### Policies
-
-The `policies` directory contains the [Conforma](https://conforma.dev/docs/user-guide/index.html) policies that need to be applied when building bundle images of individual tasks.
-
-### Task generator
-The `task-generator` directory contains a collection of tools used for generating various versions of tasks.
-
-### Scripts
-
-The `hack` directory contains the various scripts that are used during the CI runs of the build/test/release workflow for the individual Tekton tasks.
-
+Contributions are welcome! Please follow the standard Konflux CI contribution guidelines and ensure that all new tasks and pipelines are properly tested before submitting a pull request.
