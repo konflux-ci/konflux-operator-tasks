@@ -8,38 +8,38 @@ The tasks within this repository were migrated from the [Konflux build definitio
 
 ## Structure
 
-This repository is organized into several key directories, each serving a specific purpose for Tekton-related resources.
+This repository is organized into several key directories, each serving a specific purpose for Tekton-related resources:
 
-### Tasks
+- **`tasks/`**: Contains the Tekton Task definitions for various operator checks and build steps.
+- **`pipelines/`**: Contains Tekton Pipeline definitions that orchestrate the tasks.
+- **`templates/`**: Contains Tekton PipelineTemplate and TaskTemplate definitions.
+- **`hack/`**: Contains helper scripts for development and maintenance.
+- **`test/`**: Contains test files and fixtures.
 
-The `tasks` directory contains standardized [Tekton tasks](https://tekton.dev/docs/pipelines/tasks/) that are used to run different kinds of verifications for operator container builds.
+## Development
 
-#### Adding a New Task
+### Generating TA Tasks
 
-To add a new task, create a `.yaml` file inside the `tasks/<your-task-name>/0.1/` directory. Ensure it follows the Tekton [Task specification](https://tekton.dev/docs/pipelines/tasks/), is well-documented (add `README.md` file), [well-versioned](#-versioning) and includes example usage.
+The `hack/generate-ta-tasks.sh` script is used to generate Tekton Task definitions for Trusted Artifact (TA) related steps.
 
-Refer to the [Building Tekton tasks as bundles in Konflux](https://konflux-ci.dev/docs/end-to-end/building-tekton-tasks/) guide for details on how to onboard the new Tekton tasks to Konflux, enabling their integration into the Konflux build pipelines.
+> **Note:** The `hack/generate-ta-tasks.sh` script **cannot be run in the agent sandbox** due to its dependencies on external tools and network access that are not available in the sandboxed environment. If you need to regenerate TA tasks, please run this script in a full development environment with appropriate permissions and network access.
 
-#### Versioning
+### Building and Testing
 
-We follow a **versioning strategy** to ensure updates don’t break existing workflows.
+To build and test the tasks in this repository, you can use the following commands:
 
-A **new version** of a task should be created **if**:
+```bash
+# Lint the repository
+make lint
 
-- The task’s **interface changes** (e.g., parameters, workspaces, or result names are modified).
-- New functionality is introduced that **isn’t backward compatible**.
-- A critical bug fix **requires an updated implementation**.
+# Test the repository
+make test
+```
 
-Each version should be **clearly labeled** to avoid breaking existing pipelines. A `MIGRATION.md` file needs to be supplied containing instructions for migrating to the new version of the task.
+## Contributing
 
-### Policies
+Please read the [CONTRIBUTING.md](CONTRIBUTING.md) file for details on our code of conduct and the process for submitting pull requests.
 
-The `policies` directory contains the [Conforma](https://conforma.dev/docs/user-guide/index.html) policies that need to be applied when building bundle images of individual tasks.
+## License
 
-### Task generator
-The `task-generator` directory contains a collection of tools used for generating various versions of tasks.
-
-### Scripts
-
-The `hack` directory contains the various scripts that are used during the CI runs of the build/test/release workflow for the individual Tekton tasks.
-
+This project is licensed under the [Apache License 2.0](LICENSE).
