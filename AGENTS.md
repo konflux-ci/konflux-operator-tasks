@@ -61,7 +61,7 @@ Pipelines live under `pipelines/` **without version subdirectories** — unlike 
 `.tekton/` contains Pipelines-as-Code (PaC) PipelineRun definitions that trigger CI builds. Each Konflux component gets a pair of files (one for `pull-request`, one for `push` events). The naming convention differs between task and pipeline components:
 
 - **Task components:** `{task-name}-v{version}-{pull-request|push}.yaml` — the `-v{version}` segment mirrors the versioned directory structure under `task/<name>/<version>/` (e.g., `fbc-fips-check-v01-pull-request.yaml` corresponds to `task/fbc-fips-check/0.1/`).
-- **Pipeline components:** `{pipeline-name}-{pull-request|push}.yaml` — **no version segment**, because pipelines are not versioned (e.g., `pipeline-fbc-builder-pull-request.yaml` corresponds to `pipelines/fbc-builder/`).
+- **Pipeline components:** `pipeline-{pipeline-name}-{pull-request|push}.yaml` — **no version segment**, because pipelines are not versioned (e.g., `pipeline-fbc-builder-pull-request.yaml` corresponds to `pipelines/fbc-builder/`).
 
 The absence of a version designator in pipeline `.tekton/` files is intentional, not an oversight. Do not flag it as a naming convention violation.
 
