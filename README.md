@@ -8,38 +8,47 @@ The tasks within this repository were migrated from the [Konflux build definitio
 
 ## Structure
 
-This repository is organized into several key directories, each serving a specific purpose for Tekton-related resources.
+This repository is organized into several key directories, each serving a specific purpose for Tekton-related resources:
 
-### Tasks
+- `tasks/` - Contains the Tekton Task definitions for various operator checks and build steps
+- `pipelines/` - Contains Tekton Pipeline definitions that orchestrate the tasks
+- `helpers/` - Contains helper scripts and utilities used by the tasks
+- `docs/` - Contains documentation and guides for using the tasks
 
-The `tasks` directory contains standardized [Tekton tasks](https://tekton.dev/docs/pipelines/tasks/) that are used to run different kinds of verifications for operator container builds.
+## Conventions
 
-#### Adding a New Task
+### Compute Resources
 
-To add a new task, create a `.yaml` file inside the `tasks/<your-task-name>/0.1/` directory. Ensure it follows the Tekton [Task specification](https://tekton.dev/docs/pipelines/tasks/), is well-documented (add `README.md` file), [well-versioned](#-versioning) and includes example usage.
+When defining task steps, follow these conventions for `computeResources`:
 
-Refer to the [Building Tekton tasks as bundles in Konflux](https://konflux-ci.dev/docs/end-to-end/building-tekton-tasks/) guide for details on how to onboard the new Tekton tasks to Konflux, enabling their integration into the Konflux build pipelines.
+1. **Do not use empty maps**: Never specify `computeResources: {}` in task steps. If no specific resource limits are needed, omit the `computeResources` field entirely.
 
-#### Versioning
+2. **Specify explicit values**: When resource limits are required, specify explicit values for both `requests` and `limits`:
 
-We follow a **versioning strategy** to ensure updates don’t break existing workflows.
+   ```yaml
+   computeResources:
+     requests:
+       cpu: "100m"
+       memory: "128Mi"
+     limits:
+       cpu: "500m"
+       memory: "512Mi"
+   ```
 
-A **new version** of a task should be created **if**:
+3. **Use appropriate units**: Use Kubernetes resource units (e.g., `m` for millicores, `Mi` for mebibytes, `Gi` for gibibytes).
 
-- The task’s **interface changes** (e.g., parameters, workspaces, or result names are modified).
-- New functionality is introduced that **isn’t backward compatible**.
-- A critical bug fix **requires an updated implementation**.
+4. **Match step requirements**: Set resource values that are appropriate for the specific step's workload. For example:
+   - Lightweight steps (e.g., script execution, file operations): `cpu: "100m"`, `memory: "128Mi"`
+   - Build steps (e.g., compilation, image building): `cpu: "500m"`, `memory: "1Gi"`
+   - Test steps (e.g., running operator tests): `cpu: "500m"`, `memory: "1Gi"`
 
-Each version should be **clearly labeled** to avoid breaking existing pipelines. A `MIGRATION.md` file needs to be supplied containing instructions for migrating to the new version of the task.
+5. **Consistency**: Maintain consistent resource allocations across similar task steps to ensure predictable behavior and resource usage.
 
-### Policies
+## Contributing
 
-The `policies` directory contains the [Conforma](https://conforma.dev/docs/user-guide/index.html) policies that need to be applied when building bundle images of individual tasks.
+Contributions are welcome! Please follow these guidelines:
 
-### Task generator
-The `task-generator` directory contains a collection of tools used for generating various versions of tasks.
-
-### Scripts
-
-The `hack` directory contains the various scripts that are used during the CI runs of the build/test/release workflow for the individual Tekton tasks.
-
+1. Fork the repository and create a feature branch
+2. Make your changes with appropriate tests
+3. Ensure all tasks pass validation
+4.
