@@ -54,9 +54,9 @@ pipelines/<name>/
 └── README.md
 ```
 
-Pipelines live under `pipelines/` **without version subdirectories** — unlike tasks, which use `task/<name>/<version>/`. There is currently one pipeline (`fbc-builder`).
+Pipelines live under `pipelines/` **without version subdirectories** — unlike tasks, which use `task/<name>/<version>/` (e.g., `fbc-builder` lives at `pipelines/fbc-builder/`).
 
-## `.tekton/` PipelineRun file naming
+## .tekton/ PipelineRun file naming
 
 `.tekton/` contains Pipelines-as-Code (PaC) PipelineRun definitions that trigger CI builds. Each Konflux component gets a pair of files (one for `pull-request`, one for `push` events). The naming convention differs between task and pipeline components:
 
