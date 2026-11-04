@@ -20,10 +20,12 @@ Ensures file-based catalog (FBC) components do not remove versions of operators 
 ## Additional info
 
 ### What this check does:
-- Runs `opm render` on both FBC fragment and TARGET_INDEX:OCP_VERSION images.
-- Compares the channel data of the FBC fragment and target index.
-- Checks if the FBC fragment will remove channels or channel entries previously added to the target index.
+- Resolves OCP version(s) from the FBC fragment via `get_ocp_version_from_fbc_fragment` (a single string for traditional fragments, or a JSON array when `com.redhat.fbc.openshift.version` is set for binaryless fragments).
+- Runs `opm render` on the FBC fragment and on each `TARGET_INDEX:OCP_VERSION` image.
+- Compares the channel data of the FBC fragment against each version's released target index (index channels are filtered to packages present in the fragment for efficiency).
+- Checks if the FBC fragment will remove channels or channel entries previously added to any version's target index.
 - Allows pruning only in channels that contain dev-preview, pre-ga, or candidate in their names.
+- Aggregates pruning violations across all OCP versions into a single `TEST_OUTPUT` result.
 
 ## Source repository for image:
 https://github.com/konflux-ci/konflux-test
