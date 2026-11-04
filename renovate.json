@@ -39,5 +39,14 @@
       ],
       "datasourceTemplate": "docker"
     }
-  ]
+  ],
+  "tekton": {
+    "fileMatch": [
+      "\\.yaml$",
+      "\\.yml$"
+    ],
+    "includePaths": [
+      "pipelines/**"
+    ]
+  }
 }
