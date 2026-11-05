@@ -271,7 +271,7 @@ spec:
 
             ### Check for removed channels
             for chan in "${ndx_channel_names[@]}"; do
-              if echo "${fbc_channel_names[@]}" | grep -Fwq "${chan}"; then
+              if printf '%s\n' "${fbc_channel_names[@]}" | grep -Fxq -- "${chan}"; then
                 channels_to_test+=("${chan}")
               else
                 if [[ ! "${chan}" =~ ${fbc_allowed_pruned_channels} ]]; then
@@ -295,7 +295,7 @@ spec:
                 mapfile -t fbc_entries < <(jq -r --arg p "${pkg}" --arg c "${chan}" '.[] | select(.package == $p and .channel == $c) | .entries[]' "${fbc_channels}")
 
                 for entry in "${ndx_entries[@]}"; do
-                  if ! echo "${fbc_entries[@]}" | grep -Fwq "${entry}"; then
+                  if ! printf '%s\n' "${fbc_entries[@]}" | grep -Fxq -- "${entry}"; then
                     if [[ ! "${chan}" =~ ${fbc_allowed_pruned_channels} ]]; then
                       echo "!FAILURE! - [${ocp_version}] FBC fragment prunes ${entry} from ${pkg}.${chan} channel."
                       failure_num=$((failure_num + 1))
@@ -327,6 +327,7 @@ spec:
         images_processed_template='{"image": {"pullspec": "'"$IMAGE_URL"'", "digests": [%s]}}'
         image_manifests=$(get_image_manifests -i "${image_with_digest}")
         echo "image_manifests: $image_manifests"
+        digests_processed=()
         if [ -n "$image_manifests" ]; then
           while read -r _arch arch_sha; do
             digests_processed+=("\"$arch_sha\"")
