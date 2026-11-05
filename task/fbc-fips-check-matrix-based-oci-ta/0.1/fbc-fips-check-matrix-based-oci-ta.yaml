@@ -42,12 +42,24 @@ spec:
   steps:
     - name: use-buckets-artifact
       image: quay.io/konflux-ci/build-trusted-artifacts:latest@sha256:a246cf2267fe6fa68ae8885c6ca4141923edca3ccf9b56838d1ebe369d31b46d
+      computeResources:
+        limits:
+          memory: 64Mi
+        requests:
+          cpu: 50m
+          memory: 64Mi
       args:
         - use
         - $(params.BUCKETS_ARTIFACT)=/var/workdir/buckets
 
     - name: prepare-bucket-images
       image: quay.io/konflux-ci/konflux-test:v1.5.9@sha256:7faaebc542c61704003fecbab81a9c81c9770b4df8c5bba18459fba3f58e9c51
+      computeResources:
+        limits:
+          memory: 64Mi
+        requests:
+          cpu: 50m
+          memory: 64Mi
       env:
         - name: BUCKET_INDEX
           value: $(params.BUCKET_INDEX)
@@ -101,11 +113,10 @@ spec:
           value: $(params.MAX_PARALLEL)
       computeResources:
         limits:
-          cpu: "2"
-          memory: 12Gi
+          memory: 2Gi
         requests:
-          cpu: "2"
-          memory: 12Gi
+          cpu: 600m
+          memory: 2Gi
       ref:
         params:
           - name: url
@@ -118,6 +129,12 @@ spec:
 
     - name: output-results
       image: quay.io/konflux-ci/konflux-test:v1.5.9@sha256:7faaebc542c61704003fecbab81a9c81c9770b4df8c5bba18459fba3f58e9c51
+      computeResources:
+        limits:
+          memory: 64Mi
+        requests:
+          cpu: 50m
+          memory: 64Mi
       env:
         - name: BUCKET_INDEX
           value: $(params.BUCKET_INDEX)
