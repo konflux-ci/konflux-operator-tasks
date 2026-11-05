@@ -67,6 +67,16 @@ Some tasks exist as both a workspace variant (PVC-based) and an OCI-TA variant (
 
 This guidance applies to both standalone OCI-TA tasks (which have no `recipe.yaml`) and generated ones. For generated OCI-TA tasks, the generation script handles consistency; for standalone pairs, this manual guidance fills the gap.
 
+## Golden test fixtures
+
+The task generator's golden test files live under `task-generator/trusted-artifacts/golden/`. The `kustomized/` subdirectory uses **symlinks** pointing to `buildah/` — do not flag these files as missing updates when `buildah/` files are modified:
+
+- `golden/kustomized/ta.yaml` → `../buildah/ta.yaml`
+- `golden/kustomized/task.yaml` → `../buildah/base.yaml`
+- `golden/kustomized/recipe.yaml` → `../buildah/recipe.yaml`
+
+Only `golden/kustomized/kustomization.yaml` is a real file. When reviewing changes to golden files, verify that the `buildah/` originals are updated — the symlinked copies update automatically.
+
 ## OCI-TA variants
 
 Some `*-oci-ta` tasks are **generated** from base tasks by `task-generator/trusted-artifacts/`. These tasks have a `recipe.yaml` file that references their base task. After modifying a base task that has a generated OCI-TA counterpart, run `hack/generate-ta-tasks.sh` to regenerate. Do not edit generated `*-oci-ta` task YAMLs by hand — check for `recipe.yaml` first.
