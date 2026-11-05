@@ -89,7 +89,7 @@ spec:
         echo "[$(date --utc -Ins)] Input validation completed successfully"
 
     - name: discover-and-pull-sarif-artifacts
-      image: quay.io/konflux-ci/task-runner:1.7.0@sha256:1c0582a85dae0949f3ec94aca95695c5d7698b371f1b76c5a78822a6249073dc
+      image: quay.io/konflux-ci/task-runner:4.0.0@sha256:ab7440e1101af1ff0418e16badede2f1590664d3189099030bf3f782371bd9da
       workingDir: /var/workdir
       script: |
         #!/usr/bin/env bash
