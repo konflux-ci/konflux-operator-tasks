@@ -2,8 +2,6 @@
 
 ## Unreleased
 
-## 0.2
-
 ### Added
 
 - Multi-OCP support for binaryless FBC fragments that declare multiple versions via the `com.redhat.fbc.openshift.version` label (string or JSON array).
@@ -12,10 +10,14 @@
 - Package filtering of released index channels to packages present in the FBC fragment (efficiency).
 - Fail-fast comments and `tee` for render/debug visibility; remove large rendered files after use to reduce memory pressure.
 
+### Fixed
+
+- Initialize `digests_processed` before use under `set -u`.
+- Use exact (`grep -Fxq`) channel/entry membership checks to avoid false substring matches.
+
 ### Compatibility
 
-- Task parameters and results are unchanged from 0.1. Traditional single-version fragments continue to work.
-- Consumers that need multi-OCP / binaryless support should use task version `0.2`. Version `0.1` remains the legacy single-OCP behavior.
+- Task parameters and results are unchanged. Traditional single-version fragments continue to work alongside multi-OCP / binaryless fragments.
 
 ## 0.1
 
