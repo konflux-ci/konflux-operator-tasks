@@ -73,6 +73,14 @@ Some `*-oci-ta` tasks are **generated** from base tasks by `task-generator/trust
 
 Other `*-oci-ta` tasks are **standalone** — they have no base task and no `recipe.yaml`. These are authored and edited directly like any other task.
 
+## Inter-step communication
+
+Tekton tasks use `/shared/` for inter-step state. When designing inter-step communication:
+
+- **Avoid ambiguous empty states.** If a shared file can be empty for multiple reasons (e.g., all items filtered vs. no items found), the downstream step cannot safely distinguish them. Prefer designs where the upstream step's exit code (`set -euo pipefail`) disambiguates the outcome.
+- **Prefer exit codes over marker files.** Steps run under `set -euo pipefail`. If a tool returns non-zero when no items are found, that step fails automatically — no marker file is needed to signal the difference between "filtered" and "absent."
+- **If a marker file is necessary,** document the exact creation condition in code comments at both the write and read sites.
+
 ## CI checks
 
 YAML lint, Checkton, ShellSpec, Tekton integration tests, Go tests (task-generator), and migration validation all run on PRs. Check `.github/workflows/` for details.
