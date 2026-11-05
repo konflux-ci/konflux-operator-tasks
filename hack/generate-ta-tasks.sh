@@ -18,10 +18,19 @@ command -v go &> /dev/null || { echo Please install golang to run this tool; exi
 
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 TASK_DIR="$(realpath "${ROOT_DIR}/task")"
-# Prefer the in-repo generator so use-trusted-artifact defaults (3Gi/50m) match
-# shared-ci #113 before that pin is released. Override with TRUSTED_ARTIFACTS=...
-# to use a remote module version instead.
+# HACK(KONFLUX-14671): default to the in-repo generator so use-trusted-artifact
+# computeResources (3Gi/50m) apply before shared-ci #113 is released and the pin
+# below is bumped. Override with TRUSTED_ARTIFACTS=... for a remote module.
+#
+# When bumping past v1.1.0 to a release that includes use-TA computeResources,
+# restore this default to the shared-ci pin and delete the in-repo override + guard.
+_SHARED_CI_TA_GENERATOR_PIN="github.com/konflux-ci/task-repo-shared-ci/ta-generator@v1.1.0"
 : "${TRUSTED_ARTIFACTS=${ROOT_DIR}/task-generator/trusted-artifacts}"
+if [[ "${TRUSTED_ARTIFACTS}" == "${ROOT_DIR}/task-generator/trusted-artifacts" && \
+      "${_SHARED_CI_TA_GENERATOR_PIN}" != "github.com/konflux-ci/task-repo-shared-ci/ta-generator@v1.1.0" ]]; then
+  echo "error: in-repo TRUSTED_ARTIFACTS override is stale; set the default back to ${_SHARED_CI_TA_GENERATOR_PIN} (shared-ci #113 follow-up)" >&2
+  exit 1
+fi
 
 tashdir="$(mktemp -d)"
 trap 'rm -rf "${tashdir}"' EXIT
