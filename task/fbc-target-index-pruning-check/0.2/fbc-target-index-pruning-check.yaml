@@ -144,7 +144,7 @@ spec:
         ### Resolve OCP version(s): single string (legacy) or JSON array (binaryless)
         ocp_versions_raw=$(get_ocp_version_from_fbc_fragment "${IMAGE_URL}")
         if [[ -z "${ocp_versions_raw}" ]]; then
-          note="Task $(context.task.name) failed: No OCP versions returned from get_ocp_version_from_fbc_fragment."
+          note="Task $(context.task.name) failed: Empty OCP version string from FBC fragment label."
           echo "${note}"
           TEST_OUTPUT=$(make_result_json -r ERROR -t "${note}")
           echo "${TEST_OUTPUT}" | tee "$(results.TEST_OUTPUT.path)"
@@ -158,7 +158,7 @@ spec:
         fi
 
         if (( ${#ocp_versions[@]} < 1 )); then
-          note="Task $(context.task.name) failed: No OCP versions returned from get_ocp_version_from_fbc_fragment."
+          note="Task $(context.task.name) failed: Parsed OCP version list is empty after reading FBC fragment label."
           echo "${note}"
           TEST_OUTPUT=$(make_result_json -r ERROR -t "${note}")
           echo "${TEST_OUTPUT}" | tee "$(results.TEST_OUTPUT.path)"
@@ -202,6 +202,17 @@ spec:
 
         ### For each OCP version, render that version's target index and run the pruning comparison
         for ocp_version in "${ocp_versions[@]}"; do
+          # Sanitize label-sourced versions before using them in filesystem paths
+          ocp_version="${ocp_version//\//}"
+          ocp_version="${ocp_version//../}"
+          if [[ -z "${ocp_version}" ]]; then
+            note="Task $(context.task.name) failed: OCP version became empty after sanitizing path separators."
+            echo "${note}"
+            TEST_OUTPUT=$(make_result_json -r ERROR -t "${note}")
+            echo "${TEST_OUTPUT}" | tee "$(results.TEST_OUTPUT.path)"
+            exit 0
+          fi
+
           echo ""
           echo "=== Checking pruning against OCP version: ${ocp_version} ==="
 
@@ -226,7 +237,8 @@ spec:
           rm -f "${rendered_target_index}"
 
           ### Empty catalog before package filter is an error (fail-fast; see above)
-          if [[ "$(jq 'length' "${ndx_channels}")" -lt 1 ]]; then
+          ndx_len=$(jq 'length' "${ndx_channels}" 2>/dev/null || echo -1)
+          if [[ ! "${ndx_len}" =~ ^[0-9]+$ ]] || (( ndx_len < 1 )); then
             note="Task $(context.task.name) failed: No OLM packages detected in target index for ${ocp_version}."
             echo "${note}"
             TEST_OUTPUT=$(make_result_json -r ERROR -t "${note}")
