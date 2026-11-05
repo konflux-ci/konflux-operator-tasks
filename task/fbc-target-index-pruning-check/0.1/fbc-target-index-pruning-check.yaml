@@ -137,11 +137,20 @@ spec:
           note="Task $(context.task.name) failed: Rendered FBC fragment does not exist: ${rendered_fbc_image}"
           echo "${note}"
           TEST_OUTPUT=$(make_result_json -r ERROR -t "${note}")
+          echo "${TEST_OUTPUT}" | tee "$(results.TEST_OUTPUT.path)"
           exit 0
         fi
 
         ### Resolve OCP version(s): single string (legacy) or JSON array (binaryless)
         ocp_versions_raw=$(get_ocp_version_from_fbc_fragment "${IMAGE_URL}")
+        if [[ -z "${ocp_versions_raw}" ]]; then
+          note="Task $(context.task.name) failed: No OCP versions returned from get_ocp_version_from_fbc_fragment."
+          echo "${note}"
+          TEST_OUTPUT=$(make_result_json -r ERROR -t "${note}")
+          echo "${TEST_OUTPUT}" | tee "$(results.TEST_OUTPUT.path)"
+          exit 0
+        fi
+
         if jq -e 'type == "array"' >/dev/null 2>&1 <<<"${ocp_versions_raw}"; then
           mapfile -t ocp_versions < <(jq -r '.[]' <<<"${ocp_versions_raw}")
         else
@@ -199,6 +208,8 @@ spec:
           target_index_pullspec="${TARGET_INDEX}:${ocp_version}"
           echo "Rendering target index: ${target_index_pullspec}"
           rendered_target_index=$(render_opm -t "${target_index_pullspec}" --file)
+          # Fail-fast: an unusable index for one OCP version fails the whole task
+          # (remaining versions in the list are not checked).
           if [[ ! -f "${rendered_target_index}" ]]; then
             note="Task $(context.task.name) failed: Unable to render the target index image for ${ocp_version}: ${target_index_pullspec}"
             echo "${note}"
@@ -211,13 +222,16 @@ spec:
 
           ### Filter out channels and channel entries from target index render
           jq -s 'map(select(.schema == "olm.channel")) | reduce .[] as $obj ([]; . += [{package: $obj.package, channel: $obj.name, entries: [$obj.entries[].name]}])' "${rendered_target_index}" > "${ndx_channels}"
+          # Free full index render ASAP so multi-OCP loops do not retain N large catalogs in /tmp
+          rm -f "${rendered_target_index}"
 
-          ### Empty catalog before package filter is an error
+          ### Empty catalog before package filter is an error (fail-fast; see above)
           if [[ "$(jq 'length' "${ndx_channels}")" -lt 1 ]]; then
             note="Task $(context.task.name) failed: No OLM packages detected in target index for ${ocp_version}."
             echo "${note}"
             TEST_OUTPUT=$(make_result_json -r ERROR -t "${note}")
             echo "${TEST_OUTPUT}" | tee "$(results.TEST_OUTPUT.path)"
+            rm -f "${ndx_channels}"
             exit 0
           fi
 
@@ -233,13 +247,12 @@ spec:
           ### No overlapping packages: nothing to prune-check for this version
           if [[ ${#ndx_pkgs[@]} -lt 1 ]]; then
             echo "[${ocp_version}] FBC fragment is not modifying any existing channels in the target index."
+            rm -f "${ndx_channels}"
             continue
           fi
 
           ### Test packages in the FBC fragment that already exist in the target index.
-          pkgs_to_test=("${ndx_pkgs[@]}")
-
-          for pkg in "${pkgs_to_test[@]}"; do
+          for pkg in "${ndx_pkgs[@]}"; do
             channels_to_test=()
             mapfile -t fbc_channel_names < <(printf '%s\n' "${fbc_channel_names_by_pkg[${pkg}]}")
             mapfile -t ndx_channel_names < <(jq -r --arg p "${pkg}" '.[] | select(.package == $p) | .channel' "${ndx_channels}")
@@ -283,6 +296,8 @@ spec:
               done
             fi
           done
+
+          rm -f "${ndx_channels}"
         done
 
         note="Task $(context.task.name) completed: Check result for task result."

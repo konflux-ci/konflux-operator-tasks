@@ -1,6 +1,6 @@
 # fbc-target-index-pruning-check task
 
-Ensures file-based catalog (FBC) components do not remove versions of operators already added to a released catalog. Pruning is allowed only in channels that contain dev-preview, pre-ga, or candidate in their names.
+Ensures file-based catalog (FBC) components do not remove versions of operators already added to a released catalog. Supports traditional single-OCP-version fragments and binaryless fragments that target multiple OCP versions. Pruning is allowed only in channels that contain dev-preview, pre-ga, or candidate in their names.
 
 ## Parameters
 |name|description|default value|required|
@@ -20,7 +20,7 @@ Ensures file-based catalog (FBC) components do not remove versions of operators 
 ## Additional info
 
 ### What this check does:
-- Resolves OCP version(s) from the FBC fragment via `get_ocp_version_from_fbc_fragment` (a single string for traditional fragments, or a JSON array when `com.redhat.fbc.openshift.version` is set for binaryless fragments).
+- Resolves target OCP version(s) from the FBC fragment (a single version for traditional fragments, or multiple versions when the fragment declares them via the `com.redhat.fbc.openshift.version` label).
 - Runs `opm render` on the FBC fragment and on each `TARGET_INDEX:OCP_VERSION` image.
 - Compares the channel data of the FBC fragment against each version's released target index (index channels are filtered to packages present in the fragment for efficiency).
 - Checks if the FBC fragment will remove channels or channel entries previously added to any version's target index.
