@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changed
+
+- Set step `computeResources` from analyzer MAX+5% (2026-11-05; short retention): `use-trusted-artifact` 3Gi/50m (no observability → match TA default); `get-unique-related-images` 12Gi+`limits.cpu` → 6Gi/1000m (no `limits.cpu`); `split-into-buckets` 192Mi/350m; `create-buckets-artifact` 64Mi/50m (KONFLUX-14672).
+
 ### Fixed
 
 - Bumped the `konflux-test` image to `v1.5.9`.
