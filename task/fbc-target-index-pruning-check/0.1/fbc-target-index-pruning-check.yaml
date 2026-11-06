@@ -203,17 +203,10 @@ spec:
         fbc_pkgs_json=$(printf '%s\n' "${fbc_pkgs[@]}" | jq -R . | jq -s -c .)
 
         ### For each OCP version, render that version's target index and run the pruning comparison
+        # Continue across versions so all render/pruning errors are reported together.
         for ocp_version in "${ocp_versions[@]}"; do
-          # Sanitize label-sourced versions before using them in filesystem paths
-          ocp_version="${ocp_version//\//}"
-          ocp_version="${ocp_version//../}"
-          if [[ -z "${ocp_version}" ]]; then
-            note="Task $(context.task.name) failed: OCP version became empty after sanitizing path separators."
-            echo "${note}"
-            TEST_OUTPUT=$(make_result_json -r ERROR -t "${note}")
-            echo "${TEST_OUTPUT}" | tee "$(results.TEST_OUTPUT.path)"
-            exit 0
-          fi
+          # Catalog index tags always use a v prefix (e.g. :v4.18); labels may omit it.
+          [[ "${ocp_version}" == v* ]] || ocp_version="v${ocp_version}"
 
           echo ""
           echo "=== Checking pruning against OCP version: ${ocp_version} ==="
@@ -221,14 +214,11 @@ spec:
           target_index_pullspec="${TARGET_INDEX}:${ocp_version}"
           echo "Rendering target index: ${target_index_pullspec}"
           rendered_target_index=$(render_opm -t "${target_index_pullspec}" --file)
-          # Fail-fast: an unusable index for one OCP version fails the whole task
-          # (remaining versions in the list are not checked).
           if [[ ! -f "${rendered_target_index}" ]]; then
-            note="Task $(context.task.name) failed: Unable to render the target index image for ${ocp_version}: ${target_index_pullspec}"
-            echo "${note}"
-            TEST_OUTPUT=$(make_result_json -r ERROR -t "${note}")
-            echo "${TEST_OUTPUT}" | tee "$(results.TEST_OUTPUT.path)"
-            exit 0
+            echo "!FAILURE! - [${ocp_version}] Unable to render the target index image: ${target_index_pullspec}"
+            TESTPASSED=false
+            failure_num=$((failure_num + 1))
+            continue
           fi
 
           ndx_channels="/tmp/olm-channels-target-index-${ocp_version}.json"
@@ -238,15 +228,14 @@ spec:
           # Free full index render ASAP so multi-OCP loops do not retain N large catalogs in /tmp
           rm -f "${rendered_target_index}"
 
-          ### Empty catalog before package filter is an error (fail-fast; see above)
+          ### Empty catalog before package filter is an error; continue to remaining versions
           ndx_len=$(jq 'length' "${ndx_channels}" 2>/dev/null || echo -1)
           if [[ ! "${ndx_len}" =~ ^[0-9]+$ ]] || (( ndx_len < 1 )); then
-            note="Task $(context.task.name) failed: No OLM packages detected in target index for ${ocp_version}."
-            echo "${note}"
-            TEST_OUTPUT=$(make_result_json -r ERROR -t "${note}")
-            echo "${TEST_OUTPUT}" | tee "$(results.TEST_OUTPUT.path)"
+            echo "!FAILURE! - [${ocp_version}] No OLM packages detected in target index."
+            TESTPASSED=false
+            failure_num=$((failure_num + 1))
             rm -f "${ndx_channels}"
-            exit 0
+            continue
           fi
 
           ### Narrow index to packages present in the FBC fragment (full indexes are large)
