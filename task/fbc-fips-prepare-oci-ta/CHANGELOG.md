@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.2
+
+### Added
+
+- Binaryless, multi-version variant of `fbc-fips-prepare-oci-ta`.
+- Reads the **list** of target OCP versions from the `com.redhat.fbc.openshift.version` label and extracts unreleased relatedImages **per version** (dedupe key is `(image, version)`), sharing the fragment render and per-bundle render across all versions.
+- Splits images into per-version buckets named `bucket-<version>-<index>.txt` and pads every version to a uniform grid width.
+- New `OCP_VERSIONS` array result (alongside `BUCKET_INDICES`) so the check task can fan out a 2-dimensional matrix (`OCP_VERSION` × `BUCKET_INDEX`).
+- `NUM_BUCKETS` now means buckets **per OCP version** (the matrix grid width).
+- `TOTAL_IMAGES` now counts `(image, version)` pairs.
+
+### Fixed
+
+- Fail with a clear error instead of crashing on a `jq` parse error when `get_ocp_version_from_fbc_fragment` falls back to a plain version string (returned when the `com.redhat.fbc.openshift.version` label is missing) instead of the expected JSON array.
+
+### Note
+
+Designed to work with `fbc-fips-check-matrix-based-oci-ta` 0.2. The per-version split is required because `check-payload` applies a per-OCP-version exception set via `-V=<version>`.
+
 ## Unreleased
 
 ### Fixed
