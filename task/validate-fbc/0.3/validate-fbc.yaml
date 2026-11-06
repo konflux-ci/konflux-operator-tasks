@@ -277,6 +277,7 @@ spec:
           echo "${TEST_OUTPUT}" | tee "$(results.TEST_OUTPUT.path)"
           exit 0
         fi
+        echo -n "${OCP_VER_FROM_BASE}" > /shared/ocp-version
 
         ### Try to extract binaries with configs > check binaries functionality > check opm validate ###
         if [ ! -s "$IMAGE_INSPECT" ]; then
@@ -354,8 +355,9 @@ spec:
         mv "$OPM_BINARY" /shared/bin/opm
         export PATH=/shared/bin:$PATH
 
-        # We have 12 total checks
+        # We have 12 total checks (mediatype step adds +1 to successes on pass)
         check_num=12
+        echo -n "${check_num}" > /shared/check-num
         failure_num=0
         TESTPASSED=true
 
@@ -558,10 +560,6 @@ spec:
           fi
           ERROR_OUTPUT=$(make_result_json -r FAILURE -f $failure_num -s $((check_num - failure_num)) -t "$note")
           echo -n "${ERROR_OUTPUT}" | tee "$(results.TEST_OUTPUT.path)"
-        else
-          note="Task validate-fbc completed: Check result for task result."
-          TEST_OUTPUT=$(make_result_json -r SUCCESS -s $check_num -t "$note")
-          echo -n "${TEST_OUTPUT}" | tee "$(results.TEST_OUTPUT.path)"
         fi
         popd
       volumeMounts:
@@ -569,6 +567,126 @@ spec:
           name: tmp
         - mountPath: /extracted_base_img
           name: extracted-base-img
+    - name: check-related-images-mediatype
+      computeResources:
+        limits:
+          memory: 1Gi
+        requests:
+          cpu: 100m
+          memory: 1Gi
+      image: quay.io/konflux-ci/operator-foundry:0.1@sha256:6ef5b05ba15d4d95478b145adb38b13fb4ac86db9e83dd9bac1ea82c58d67286
+      # Non-root: earlier steps use HOME=/tmp as root and leave root-owned
+      # /tmp/.docker. A step-local HOME lets Tekton cred-init copy SA pull
+      # secrets into a writable path without runAsUser: 0.
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
+        readOnlyRootFilesystem: true
+      env:
+        - name: HOME
+          value: /tmp/mediatype-home
+        - name: DOCKER_CONFIG
+          value: /tmp/mediatype-home/.docker
+      script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        # On the success path this step owns the final TEST_OUTPUT (extract-and-
+        # validate no longer writes SUCCESS). Keep it last among steps that
+        # write TEST_OUTPUT on success.
+
+        # Intentional paths exit 0 after writing TEST_OUTPUT. This trap only
+        # covers unexpected set -e failures so Konflux still gets structured JSON.
+        # (This image has no /utils.sh handle_error — use operator-foundry.)
+        handle_error() {
+          local exit_code=$?
+          local out
+          out="$(results.TEST_OUTPUT.path)"
+          [[ "${exit_code}" -eq 0 || -s "${out}" ]] && return 0
+          echo "Step check-related-images-mediatype failed unexpectedly (exit ${exit_code})." >&2
+          local successes=0
+          [[ -s /shared/check-num ]] && successes=$(cat /shared/check-num)
+          local note="Step check-related-images-mediatype failed: Unexpected error (exit ${exit_code}). Check Tekton task log."
+          operator-foundry make-result-json --result ERROR --successes "${successes}" --failures 1 --note "${note}" \
+            | tee "${out}" >/dev/null || true
+        }
+        trap handle_error EXIT
+
+        if [[ -s $(results.TEST_OUTPUT.path) ]]; then
+          echo "Test failed in previous step. Bailing."
+          echo "For details, check Tekton task result TEST_OUTPUT in the extract-and-validate step."
+          exit 0
+        fi
+
+        if [ ! -s /shared/check-num ]; then
+          echo "Extract check count not available from previous step; treating as ERROR."
+          echo "For details, check Tekton task log for the extract-and-validate step."
+          note="Step check-related-images-mediatype failed: extract check count (/shared/check-num) not available from extract-and-validate. For details, check Tekton task log."
+          TEST_OUTPUT="$(operator-foundry make-result-json --result ERROR --failures 1 --note "${note}")"
+          echo "${TEST_OUTPUT}" | tee "$(results.TEST_OUTPUT.path)"
+          exit 0
+        fi
+
+        if [ ! -s /shared/ocp-version ]; then
+          echo "OCP version not available from previous step; treating as ERROR."
+          echo "For details, check Tekton task log for the extract-and-validate step."
+          note="Step check-related-images-mediatype failed: OCP version not available from extract-and-validate. For details, check Tekton task log."
+          TEST_OUTPUT="$(operator-foundry make-result-json --result ERROR --successes "$(cat /shared/check-num)" --failures 1 --note "${note}")"
+          echo "${TEST_OUTPUT}" | tee "$(results.TEST_OUTPUT.path)"
+          exit 0
+        fi
+
+        if [ ! -s /shared/related-images.json ]; then
+          echo "Related images not available from previous step; treating as ERROR."
+          echo "For details, check Tekton task log for the extract-and-validate step."
+          note="Step check-related-images-mediatype failed: Related images not available from extract-and-validate. For details, check Tekton task log."
+          TEST_OUTPUT="$(operator-foundry make-result-json --result ERROR --successes "$(cat /shared/check-num)" --failures 1 --note "${note}")"
+          echo "${TEST_OUTPUT}" | tee "$(results.TEST_OUTPUT.path)"
+          exit 0
+        fi
+
+        OCP_VERSION=$(cat /shared/ocp-version)
+
+        # Non-zero exit: tooling/unexpected error (not a mediaType policy FAILURE).
+        if ! operator-foundry fbc check-related-images-mediatype \
+          --ocp-version "$OCP_VERSION" \
+          --related-images-json-path /shared/related-images.json \
+          --output "$(results.TEST_OUTPUT.path)"; then
+          note="Step check-related-images-mediatype failed: operator-foundry encountered an error. For details, check Tekton task log."
+          TEST_OUTPUT="$(operator-foundry make-result-json --result ERROR --successes "$(cat /shared/check-num)" --failures 1 --note "${note}")"
+          echo "${TEST_OUTPUT}" | tee "$(results.TEST_OUTPUT.path)"
+          exit 0
+        fi
+
+        # Exit 0 but no --output written (defensive; should not happen).
+        if [[ ! -s $(results.TEST_OUTPUT.path) ]]; then
+          note="Step check-related-images-mediatype failed: operator-foundry exited successfully but did not write TEST_OUTPUT. For details, check Tekton task log."
+          TEST_OUTPUT="$(operator-foundry make-result-json --result ERROR --successes "$(cat /shared/check-num)" --failures 1 --note "${note}")"
+          echo "${TEST_OUTPUT}" | tee "$(results.TEST_OUTPUT.path)"
+          exit 0
+        fi
+
+        # Exit 0 + SUCCESS: fold extract check-num and replace note with task-level summary.
+        if grep -q '"result":"SUCCESS"' "$(results.TEST_OUTPUT.path)"; then
+          note="Task validate-fbc completed: Check result for task result."
+          TEST_OUTPUT="$(operator-foundry make-result-json --result SUCCESS \
+            --successes "$(( $(cat /shared/check-num) + 1 ))" --note "${note}")"
+          echo "${TEST_OUTPUT}" | tee "$(results.TEST_OUTPUT.path)"
+        # Exit 0 + FAILURE (wrong/unavailable mediaType): log foundry detail, rewrite task-level result.
+        else
+          note="Related images mediatype check failed for OCP ${OCP_VERSION}. Check task log for details."
+          TEST_OUTPUT="$(operator-foundry make-result-json --result FAILURE \
+            --successes "$(cat /shared/check-num)" --failures 1 --note "${note}")"
+          echo "${TEST_OUTPUT}" | tee "$(results.TEST_OUTPUT.path)"
+        fi
+
+      volumeMounts:
+        # Writable HOME under readOnlyRootFilesystem (shared emptyDir with
+        # earlier steps; step-local HOME avoids their root-owned .docker).
+        - mountPath: /tmp
+          name: tmp
     - name: save-related-images
       computeResources:
         limits:
