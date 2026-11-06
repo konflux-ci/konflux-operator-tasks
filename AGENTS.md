@@ -73,10 +73,10 @@ Some `*-oci-ta` tasks are **generated** from base tasks by `task-generator/trust
 
 Other `*-oci-ta` tasks are **standalone** — they have no base task and no `recipe.yaml`. These are authored and edited directly like any other task.
 
-## computeResources sizing conventions
+## Sizing conventions for computeResources
 
 - Values are derived from the Konflux resource analyzer. Document the analyzer date in the CHANGELOG entry.
-- Always set `limits.memory` equal to `requests.memory` (Guaranteed QoS class). Do not add headroom between request and limit — the headroom is in the request value itself.
+- Always set `limits.memory` equal to `requests.memory` (explicit OOM-kill boundary; the pod is Burstable because `limits.cpu` is intentionally omitted). Do not add headroom between request and limit — the headroom is in the request value itself.
 - Do not set `limits.cpu` — only set `requests.cpu`.
 - Use power-of-two memory values (64Mi, 128Mi, 256Mi, etc.). When the analyzer maximum does not align to a power-of-two, round up to the next boundary.
 - The CHANGELOG must accurately describe the sizing rule used. If values are rounded up from analyzer output, state the rounding convention (e.g., "rounded to next power-of-two") rather than claiming a different formula.
