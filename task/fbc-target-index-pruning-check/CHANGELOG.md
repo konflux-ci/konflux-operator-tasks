@@ -16,12 +16,17 @@
 - Continue across OCP versions on render/empty-index errors; remove large rendered files after use to reduce memory pressure.
 - Normalize OCP versions with a `v` prefix before building target index pullspecs.
 
+### Changed
+
+- Target-index render failures and empty-index errors for a given OCP version now count as `FAILURE` and the task continues checking remaining versions (previously immediate `ERROR` exits). Single-version fragments still fail the task overall when that version cannot be checked.
+- Multi-OCP / binaryless support ships in task version `0.1` by team decision (no new Konflux component). Behavior is additive: traditional single-version fragments keep the same params and results.
+
 ### Fixed
 
 - Initialize `digests_processed` before use under `set -u`.
 - Use exact (`grep -Fxq`) channel/entry membership checks to avoid false substring matches.
-- Deduplicate OCP versions before the multi-version pruning loop.
+- Deduplicate OCP versions and drop empty strings before the multi-version pruning loop.
 
 ### Note
 
-- Task parameters and results are unchanged. Traditional single-version fragments continue to work alongside multi-OCP / binaryless fragments.
+Task parameters and results are unchanged. Traditional single-version fragments continue to work alongside multi-OCP / binaryless fragments.

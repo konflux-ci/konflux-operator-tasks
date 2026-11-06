@@ -157,7 +157,7 @@ spec:
           ocp_versions=("${ocp_versions_raw}")
         fi
 
-        mapfile -t ocp_versions < <(printf '%s\n' "${ocp_versions[@]}" | sort -u)
+        mapfile -t ocp_versions < <(printf '%s\n' "${ocp_versions[@]}" | sed '/^$/d' | sort -u)
 
         if (( ${#ocp_versions[@]} < 1 )); then
           note="Task $(context.task.name) failed: Parsed OCP version list is empty after reading FBC fragment label."
@@ -261,6 +261,8 @@ spec:
             mapfile -t ndx_channel_names < <(jq -r --arg p "${pkg}" '.[] | select(.package == $p) | .channel' "${ndx_channels}")
 
             ### Check for removed channels
+            # Exact-line match (-Fx) avoids false hits like "stable" inside "stable-4.17"
+            # (safer than the older echo | grep -Fwq idiom used in some other tasks).
             for chan in "${ndx_channel_names[@]}"; do
               if printf '%s\n' "${fbc_channel_names[@]}" | grep -Fxq -- "${chan}"; then
                 channels_to_test+=("${chan}")
