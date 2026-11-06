@@ -46,6 +46,73 @@ task/<name>/
     └── tests/               # Tekton integration tests
 ```
 
+## Step conventions
+
+When adding or modifying steps in a Tekton task, follow these conventions.
+
+### securityContext
+
+Steps that access container registries (using `oras`, `skopeo`, `operator-foundry`, `konflux-test`, or any tool that reads OCI/Docker credentials) typically need elevated privileges:
+
+```yaml
+securityContext:
+  runAsUser: 0
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+    add:
+      - SETFCAP
+  readOnlyRootFilesystem: true
+```
+
+Steps that only perform local computation (no registry access, no credential files) should minimize privileges:
+
+```yaml
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: true
+```
+
+When adding a new step, check whether it accesses registries or reads credential files. If it does not, omit `runAsUser: 0` and `SETFCAP`. See `task/validate-fbc/0.3/validate-fbc.yaml` for both patterns in one task.
+
+### volumeMounts
+
+Common shared volumes:
+
+- **`/shared`** (`emptyDir: {}`) — inter-step data exchange within a task. Typically mounted via `stepTemplate` so all steps share it.
+- **`/tmp`** (`emptyDir: {}`) — required per-step when `readOnlyRootFilesystem: true` is set, since the container's `/tmp` is not writable otherwise. Also used for Docker credential access (`/tmp/.docker/config.json`) in registry-accessing steps.
+
+### env variables
+
+- **`HOME=/tmp`** — the standard setting for steps that access registries. Tekton's credential initializer copies pull-secret credentials into `$HOME/.docker/config.json`, so setting `HOME=/tmp` (with a `/tmp` emptyDir mount) makes credentials available. When a non-root step runs after root steps that wrote to `/tmp/.docker`, use a step-local HOME (e.g., `HOME=/tmp/mediatype-home`) to avoid permission conflicts.
+- **`DOCKER_CONFIG`** — set explicitly only when the step needs a non-default Docker config path (e.g., `DOCKER_CONFIG=/tmp/mediatype-home/.docker` for non-root steps that need their own credential directory).
+
+### TEST_OUTPUT formatting
+
+Steps that produce test results must write structured JSON to `$(results.TEST_OUTPUT.path)`. Two approaches exist:
+
+- **`make_result_json`** (shell function from the `konflux-test` image) — the established pattern used by most tasks: `TEST_OUTPUT=$(make_result_json -r "SUCCESS" -s 1 -t "$note")`
+- **`operator-foundry make-result-json`** (CLI from the `operator-foundry` image) — the newer tool for tasks using that image: `operator-foundry make-result-json --result SUCCESS --successes 1 --note "$note"`
+
+Use whichever tool is available in the step's container image. **Every exit path** (success, failure, error, unexpected) must write a valid TEST_OUTPUT result — missing output on any path risks silent failures. Check that no code path can reach `exit` without first writing to `$(results.TEST_OUTPUT.path)`.
+
+### Prior-step failure check
+
+Steps that run after other result-producing steps should check whether a prior step already wrote a failure result, and bail out early if so:
+
+```bash
+if [[ -s $(results.TEST_OUTPUT.path) ]]; then
+  echo "Test failed in previous step. Bailing."
+  exit 0
+fi
+```
+
+This works because Tekton task results are shared across all steps. Use `exit 0` (not a failure code) so the task completes normally — the prior step's TEST_OUTPUT already carries the failure information. See `task/validate-fbc/0.3/validate-fbc.yaml` for this pattern.
+
 ## Multi-version task consistency
 
 Some tasks have multiple version directories (e.g., `task/foo/0.1/` and `0.2/`). When modifying a task that has more than one version:
