@@ -157,7 +157,14 @@ spec:
           ocp_versions=("${ocp_versions_raw}")
         fi
 
-        mapfile -t ocp_versions < <(printf '%s\n' "${ocp_versions[@]}" | sed '/^$/d' | sort -u)
+        # Drop empties, normalize v-prefix, then dedupe (so "4.18" and "v4.18" collapse to one)
+        mapfile -t ocp_versions < <(
+          for v in "${ocp_versions[@]}"; do
+            [[ -z "${v}" ]] && continue
+            [[ "${v}" == v* ]] || v="v${v}"
+            printf '%s\n' "${v}"
+          done | sort -u
+        )
 
         if (( ${#ocp_versions[@]} < 1 )); then
           note="Task $(context.task.name) failed: Parsed OCP version list is empty after reading FBC fragment label."
@@ -205,15 +212,18 @@ spec:
         ### For each OCP version, render that version's target index and run the pruning comparison
         # Continue across versions so all render/pruning errors are reported together.
         for ocp_version in "${ocp_versions[@]}"; do
-          # Catalog index tags always use a v prefix (e.g. :v4.18); labels may omit it.
-          [[ "${ocp_version}" == v* ]] || ocp_version="v${ocp_version}"
-
           echo ""
           echo "=== Checking pruning against OCP version: ${ocp_version} ==="
 
           target_index_pullspec="${TARGET_INDEX}:${ocp_version}"
           echo "Rendering target index: ${target_index_pullspec}"
-          rendered_target_index=$(render_opm -t "${target_index_pullspec}" --file)
+          # Guard render_opm so set -e does not abort the multi-OCP loop on non-zero exit
+          if ! rendered_target_index=$(render_opm -t "${target_index_pullspec}" --file); then
+            echo "!FAILURE! - [${ocp_version}] Unable to render the target index image: ${target_index_pullspec}"
+            TESTPASSED=false
+            failure_num=$((failure_num + 1))
+            continue
+          fi
           if [[ ! -f "${rendered_target_index}" ]]; then
             echo "!FAILURE! - [${ocp_version}] Unable to render the target index image: ${target_index_pullspec}"
             TESTPASSED=false
@@ -257,14 +267,21 @@ spec:
           ### Test packages in the FBC fragment that already exist in the target index.
           for pkg in "${ndx_pkgs[@]}"; do
             channels_to_test=()
-            mapfile -t fbc_channel_names < <(printf '%s\n' "${fbc_channel_names_by_pkg[${pkg}]}")
+            mapfile -t fbc_channel_names < <(printf '%s\n' "${fbc_channel_names_by_pkg["${pkg}"]}")
             mapfile -t ndx_channel_names < <(jq -r --arg p "${pkg}" '.[] | select(.package == $p) | .channel' "${ndx_channels}")
 
             ### Check for removed channels
-            # Exact-line match (-Fx) avoids false hits like "stable" inside "stable-4.17"
-            # (safer than the older echo | grep -Fwq idiom used in some other tasks).
+            # Exact string compare (no printf|grep): under set -o pipefail, grep -q + SIGPIPE
+            # can spuriously treat a retained channel/entry as pruned on large lists.
             for chan in "${ndx_channel_names[@]}"; do
-              if printf '%s\n' "${fbc_channel_names[@]}" | grep -Fxq -- "${chan}"; then
+              channel_present=false
+              for fbc_chan in "${fbc_channel_names[@]}"; do
+                if [[ "${fbc_chan}" == "${chan}" ]]; then
+                  channel_present=true
+                  break
+                fi
+              done
+              if [[ "${channel_present}" == true ]]; then
                 channels_to_test+=("${chan}")
               else
                 if [[ ! "${chan}" =~ ${fbc_allowed_pruned_channels} ]]; then
@@ -288,7 +305,14 @@ spec:
                 mapfile -t fbc_entries < <(jq -r --arg p "${pkg}" --arg c "${chan}" '.[] | select(.package == $p and .channel == $c) | .entries[]' "${fbc_channels}")
 
                 for entry in "${ndx_entries[@]}"; do
-                  if ! printf '%s\n' "${fbc_entries[@]}" | grep -Fxq -- "${entry}"; then
+                  entry_present=false
+                  for fbc_entry in "${fbc_entries[@]}"; do
+                    if [[ "${fbc_entry}" == "${entry}" ]]; then
+                      entry_present=true
+                      break
+                    fi
+                  done
+                  if [[ "${entry_present}" != true ]]; then
                     if [[ ! "${chan}" =~ ${fbc_allowed_pruned_channels} ]]; then
                       echo "!FAILURE! - [${ocp_version}] FBC fragment prunes ${entry} from ${pkg}.${chan} channel."
                       failure_num=$((failure_num + 1))

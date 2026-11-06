@@ -24,8 +24,10 @@
 ### Fixed
 
 - Initialize `digests_processed` before use under `set -u`.
-- Use exact (`grep -Fxq`) channel/entry membership checks to avoid false substring matches.
-- Deduplicate OCP versions and drop empty strings before the multi-version pruning loop.
+- Exact channel/entry membership via string compare (avoids `grep -q` SIGPIPE under `pipefail` on large lists).
+- Normalize `v` prefix before deduplicating OCP versions so `4.18` and `v4.18` are not checked twice.
+- Guard `render_opm` failures so `set -e` does not abort the multi-OCP loop.
+- Drop empty OCP version strings before the pruning loop.
 
 ### Note
 
