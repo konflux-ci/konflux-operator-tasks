@@ -41,9 +41,9 @@
     }
   ],
   "tekton": {
-    "fileMatch": [
-      "\\.yaml$",
-      "\\.yml$"
+    "managerFilePatterns": [
+      "/\\.yaml$/",
+      "/\\.yml$/"
     ],
     "includePaths": [
       "pipelines/**"
