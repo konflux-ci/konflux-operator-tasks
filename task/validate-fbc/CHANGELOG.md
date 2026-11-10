@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changed
+
+- Refreshed the `operator-foundry:0.1` image digest to the current tag digest.
+
 ### Removed
 
 - Removed deprecated 0.1 and 0.2 task versions, Tekton pipelines, and migration scripts.
