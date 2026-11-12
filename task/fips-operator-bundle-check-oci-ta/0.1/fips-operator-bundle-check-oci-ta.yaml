@@ -62,7 +62,7 @@ spec:
           cpu: 50m
           memory: 3Gi
     - name: get-unique-related-images
-      image: quay.io/konflux-ci/konflux-test:v1.5.9@sha256:7faaebc542c61704003fecbab81a9c81c9770b4df8c5bba18459fba3f58e9c51
+      image: quay.io/konflux-ci/konflux-test:v1.5.11@sha256:3e54b27ccc83159c52dd1602e563b2b35b4811fd2b9c754bc1ca84b8cc430cd5
       volumeMounts:
         - mountPath: /tmp
           name: tmp
@@ -183,12 +183,12 @@ spec:
           - name: url
             value: https://github.com/konflux-ci/konflux-operator-tasks
           - name: revision
-            value: c0705183d4fa1df643ba6c306c66e6f2c0276e40
+            value: 1bbd699c0907b1f3ee164372f53f0e7a9c3e8ae6
           - name: pathInRepo
             value: stepactions/fips-operator-check-step-action/0.1/fips-operator-check-step-action.yaml
         resolver: git
     - name: parse-images-processed-result
-      image: quay.io/konflux-ci/konflux-test:v1.5.9@sha256:7faaebc542c61704003fecbab81a9c81c9770b4df8c5bba18459fba3f58e9c51
+      image: quay.io/konflux-ci/konflux-test:v1.5.11@sha256:3e54b27ccc83159c52dd1602e563b2b35b4811fd2b9c754bc1ca84b8cc430cd5
       script: |
         #!/usr/bin/env bash
         set -euo pipefail
