@@ -39,5 +39,21 @@
       ],
       "datasourceTemplate": "docker"
     }
+  ],
+  "tekton": {
+    "managerFilePatterns": [
+      "/\\.yaml$/",
+      "/\\.yml$/"
+    ],
+    "includePaths": [
+      "pipelines/**"
+    ]
+  },
+  "packageRules": [
+    {
+      "matchManagers": ["gomod"],
+      "matchDepTypes": ["indirect"],
+      "enabled": true
+    }
   ]
 }

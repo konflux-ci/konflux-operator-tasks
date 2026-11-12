@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changed
+
+- Set `use-trusted-artifact` step `computeResources` to 3Gi memory (req=lim) and 50m CPU request (no `limits.cpu`), from the TA generator default (KONFLUX-14671).
+
 ### Fixed
 
 - Bumped the `konflux-test` image to `v1.5.9`.

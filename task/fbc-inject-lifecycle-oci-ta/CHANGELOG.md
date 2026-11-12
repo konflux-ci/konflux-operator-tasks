@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Changed
+
+- Refreshed the `operator-foundry:0.1` image digest to the current tag digest.
+
+- Set missing `use-trusted-artifact` / `create-trusted-artifact` `computeResources` from analyzer MAX+5% (2026-11-05): 128Mi/50m and 64Mi/50m (no `limits.cpu`) (KONFLUX-15255).
+
 ### Added
 
 - Added `model-validation-operator` to the built-in `SKIP_PACKAGES` list. This

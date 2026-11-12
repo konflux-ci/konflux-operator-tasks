@@ -5,6 +5,8 @@
 ### Removed
 
 - Removed deprecated 0.1 and 0.2 task versions, Tekton pipelines, and migration scripts.
+- Reverted the OCI related-image mediaType check added to version 0.3. The
+  `extract-and-validate` step again writes the final success `TEST_OUTPUT`.
 
 ## 0.3
 
