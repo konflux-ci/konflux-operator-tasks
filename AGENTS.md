@@ -117,3 +117,13 @@ Other `*-oci-ta` tasks are **standalone** — they have no base task and no `rec
 ## CI checks
 
 YAML lint, Checkton, ShellSpec, Tekton integration tests, Go tests (task-generator), and migration validation all run on PRs. Check `.github/workflows/` for details.
+
+## AGENTS.md writing conventions
+
+When adding or editing sections in this file, follow these style rules:
+
+- Use angle-bracket placeholders (`<name>`, `<version>`) for variable path segments, not curly-brace style.
+- Section headings (`##`) must be capitalized plain noun phrases (e.g., `Task structure`, `CI checks`). Do not embed filesystem paths, code spans, or backtick formatting in headings.
+- Unordered list items use plain text labels without bold formatting.
+- Do not assert exact counts of directories, tasks, or pipelines (these become stale). Use stable examples instead (e.g., `fbc-builder`).
+- When documenting filename patterns that involve transformations (e.g., version `0.1` → `v01`), state the transformation rule explicitly.
