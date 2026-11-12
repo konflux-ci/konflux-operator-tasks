@@ -2,8 +2,9 @@
 
 ## What Changed
 
-`validate-fbc` 0.3 adds an OCI related-image mediaType check (OCP below 4.21).
-The version bump also injects `fbc-inject-lifecycle-oci-ta` via MintMaker.
+No functional changes were made to `validate-fbc` itself. This version bump
+is used to automatically inject the new `fbc-inject-lifecycle-oci-ta` task
+into FBC builder pipelines via MintMaker.
 
 ## What the Migration Script Does
 
