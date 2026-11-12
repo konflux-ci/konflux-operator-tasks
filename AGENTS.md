@@ -111,7 +111,7 @@ Other `*-oci-ta` tasks are **standalone** — they have no base task and no `rec
 `hack/generate-ta-tasks.sh` defaults to building the local generator from `task-generator/trusted-artifacts/` (which includes `ta.go`). The generator calls `remote.Head()` to resolve the digest of `quay.io/konflux-ci/build-trusted-artifacts:latest`, which requires network access. It cannot run in the agent sandbox. When a change to a base task affects generated OCI-TA tasks (those with `recipe.yaml`):
 
 1. **Make the change** to the base task normally
-2. **Do NOT hand-edit** the generated YAML files — hand-edits will be overwritten and will fail the 'Check Trusted Artifact variants' CI check
+2. **Do NOT hand-edit** the generated YAML files — hand-edits will be overwritten and will fail the Check Trusted Artifact variants CI check
 3. **Indicate in the PR description** that a maintainer must run `hack/generate-ta-tasks.sh` and push the regenerated files to the PR branch before it can merge
 
 ## Sizing conventions for computeResources
