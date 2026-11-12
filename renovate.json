@@ -48,5 +48,12 @@
     "includePaths": [
       "pipelines/**"
     ]
-  }
+  },
+  "packageRules": [
+    {
+      "matchManagers": ["gomod"],
+      "matchDepTypes": ["indirect"],
+      "enabled": true
+    }
+  ]
 }
