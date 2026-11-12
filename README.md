@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This repository contains a collection of [Tekton](https://tekton.dev/) resources and helpers designed to support building and running operator checks in the [Konflux CI](https://konflux-ci.dev/docs/) pipelines. The goal is to provide a trusted set of operator testing tasks that can be used to ensure the quality of the operator images that are built in the Konflux CI system.
+This repository contains a collection of [Tekton](https://tekton.dev/) resources and helpers designed to support building and running operator checks in the [Konflux CI](https://konflux-ci.dev/docs/) pipelines. The goal is to provide a trusted set of operator testing tasks and pipelines that can be used to ensure the quality of the operator images that are built in the Konflux CI system.
 
 The tasks within this repository were migrated from the [Konflux build definitions repository](https://github.com/konflux-ci/build-definitions), which now holds the base build pipeline definitions and templates that reference these tasks.
 
@@ -31,6 +31,10 @@ A **new version** of a task should be created **if**:
 - A critical bug fix **requires an updated implementation**.
 
 Each version should be **clearly labeled** to avoid breaking existing pipelines. A `MIGRATION.md` file needs to be supplied containing instructions for migrating to the new version of the task.
+
+### Pipelines
+
+The `pipelines` directory contains [Tekton pipelines](https://tekton.dev/docs/pipelines/pipelines/) that orchestrate multiple tasks into end-to-end workflows for operator builds. Unlike tasks, pipelines are not versioned — each pipeline lives directly under `pipelines/<name>/`.
 
 ### Policies
 
