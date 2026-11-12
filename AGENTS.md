@@ -112,7 +112,7 @@ Other `*-oci-ta` tasks are **standalone** — they have no base task and no `rec
 
 1. **Make the change** to the base task normally
 2. **Do NOT hand-edit** the generated YAML files — hand-edits will be overwritten and will fail the 'Check Trusted Artifact variants' CI check
-3. **Note in the PR description** that a maintainer must run `hack/generate-ta-tasks.sh` and push the regenerated files to the PR branch before it can merge
+3. **Indicate in the PR description** that a maintainer must run `hack/generate-ta-tasks.sh` and push the regenerated files to the PR branch before it can merge
 
 Changes to `ta.go` only affect generated tasks once published to the external `task-repo-shared-ci` repository — the generation script installs a pinned version from that repository, not the local source.
 
