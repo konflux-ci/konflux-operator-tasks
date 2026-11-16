@@ -16,6 +16,9 @@ The fips-operator-bundle-check task uses the check-payload tool to verify if an 
 |IMAGES_PROCESSED|Images processed in the task.|
 |TEST_OUTPUT|Tekton task test output.|
 
+## Outputs
+
+`/tekton/home/fips-report.json` — A structured FIPS scan report written at the end of the scan. Contains a UTC timestamp, summary counters, and a per-image array with the result and findings for each scanned image. See the [fips-operator-check-step-action README](../../stepactions/fips-operator-check-step-action/0.1/README.md) for the full JSON schema.
 
 ## Additional info
 ### Parallel Processing
