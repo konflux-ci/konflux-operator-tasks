@@ -25,8 +25,8 @@ Ensures file-based catalog (FBC) components do not remove versions of operators 
 - Compares the channel data of the FBC fragment against each version's released target index (index channels are filtered to packages present in the fragment for efficiency).
 - Checks if the FBC fragment will remove channels or channel entries previously added to any version's target index.
 - Allows pruning only in channels that contain dev-preview, pre-ga, or candidate in their names.
-- Aggregates pruning violations across all OCP versions into a single `TEST_OUTPUT` result.
-- Continues across OCP versions on render or empty-index errors so all failures are reported together.
+- Aggregates results across all OCP versions into a single `TEST_OUTPUT` result.
+- Continues across OCP versions on render or empty-index issues so all problems are reported together (`ERROR` for render/empty-index; `FAILURE` for pruning violations).
 - Normalizes OCP versions to a `v` prefix before pulling `TARGET_INDEX` tags (e.g. `4.18` → `v4.18`).
 
 ## Source repository for image:

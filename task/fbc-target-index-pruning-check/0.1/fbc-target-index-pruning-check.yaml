@@ -144,7 +144,7 @@ spec:
         ### Resolve OCP version(s): single string (legacy) or JSON array (binaryless)
         ocp_versions_raw=$(get_ocp_version_from_fbc_fragment "${IMAGE_URL}")
         if [[ -z "${ocp_versions_raw}" ]]; then
-          note="Task $(context.task.name) failed: Empty OCP version string from FBC fragment label."
+          note="Task $(context.task.name) failed: Unable to determine OCP version(s) from FBC fragment."
           echo "${note}"
           TEST_OUTPUT=$(make_result_json -r ERROR -t "${note}")
           echo "${TEST_OUTPUT}" | tee "$(results.TEST_OUTPUT.path)"
@@ -157,17 +157,16 @@ spec:
           ocp_versions=("${ocp_versions_raw}")
         fi
 
-        # Drop empties, normalize v-prefix, then dedupe (so "4.18" and "v4.18" collapse to one)
+        # Normalize v-prefix, then dedupe (so "4.18" and "v4.18" collapse to one)
         mapfile -t ocp_versions < <(
           for v in "${ocp_versions[@]}"; do
-            [[ -z "${v}" ]] && continue
             [[ "${v}" == v* ]] || v="v${v}"
             printf '%s\n' "${v}"
           done | sort -u
         )
 
         if (( ${#ocp_versions[@]} < 1 )); then
-          note="Task $(context.task.name) failed: Parsed OCP version list is empty after reading FBC fragment label."
+          note="Task $(context.task.name) failed: Parsed OCP version list is empty."
           echo "${note}"
           TEST_OUTPUT=$(make_result_json -r ERROR -t "${note}")
           echo "${TEST_OUTPUT}" | tee "$(results.TEST_OUTPUT.path)"
@@ -177,6 +176,7 @@ spec:
         echo "OCP versions to check: ${ocp_versions[*]}"
 
         failure_num=0
+        render_error_num=0
         TESTPASSED=true
         # Allowed pruned channels are those that contain dev-preview, pre-ga, or candidate anywhere in their names
         fbc_allowed_pruned_channels=".*(dev-preview|pre-ga|candidate).*"
@@ -192,7 +192,7 @@ spec:
         echo ""
 
         ### Get the package(s) the fragment is configuring
-        mapfile -t fbc_pkgs < <(jq -r '.[].package ' "${fbc_channels}" | sort -u)
+        mapfile -t fbc_pkgs < <(jq -r '.[].package' "${fbc_channels}" | sort -u)
         if (( ${#fbc_pkgs[@]} < 1 )); then
           note="Task $(context.task.name) failed: No OLM packages detected in FBC fragment."
           echo "${note}"
@@ -210,7 +210,8 @@ spec:
         fbc_pkgs_json=$(printf '%s\n' "${fbc_pkgs[@]}" | jq -R . | jq -s -c .)
 
         ### For each OCP version, render that version's target index and run the pruning comparison
-        # Continue across versions so all render/pruning errors are reported together.
+        # Continue across versions so all render/pruning issues are reported together.
+        # ERROR = render/empty-index (infra); FAILURE = pruning policy violations.
         for ocp_version in "${ocp_versions[@]}"; do
           echo ""
           echo "=== Checking pruning against OCP version: ${ocp_version} ==="
@@ -219,15 +220,8 @@ spec:
           echo "Rendering target index: ${target_index_pullspec}"
           # Guard render_opm so set -e does not abort the multi-OCP loop on non-zero exit
           if ! rendered_target_index=$(render_opm -t "${target_index_pullspec}" --file); then
-            echo "!FAILURE! - [${ocp_version}] Unable to render the target index image: ${target_index_pullspec}"
-            TESTPASSED=false
-            failure_num=$((failure_num + 1))
-            continue
-          fi
-          if [[ ! -f "${rendered_target_index}" ]]; then
-            echo "!FAILURE! - [${ocp_version}] Unable to render the target index image: ${target_index_pullspec}"
-            TESTPASSED=false
-            failure_num=$((failure_num + 1))
+            echo "!ERROR! - [${ocp_version}] Unable to render the target index image: ${target_index_pullspec}"
+            render_error_num=$((render_error_num + 1))
             continue
           fi
 
@@ -238,12 +232,10 @@ spec:
           # Free full index render ASAP so multi-OCP loops do not retain N large catalogs in /tmp
           rm -f "${rendered_target_index}"
 
-          ### Empty catalog before package filter is an error; continue to remaining versions
-          ndx_len=$(jq 'length' "${ndx_channels}" 2>/dev/null || echo -1)
-          if [[ ! "${ndx_len}" =~ ^[0-9]+$ ]] || (( ndx_len < 1 )); then
-            echo "!FAILURE! - [${ocp_version}] No OLM packages detected in target index."
-            TESTPASSED=false
-            failure_num=$((failure_num + 1))
+          ### Ensure target index actually contains OLM channels
+          if ! jq -e 'length > 0' "${ndx_channels}" >/dev/null 2>&1; then
+            echo "!ERROR! - [${ocp_version}] No OLM channels detected in target index."
+            render_error_num=$((render_error_num + 1))
             rm -f "${ndx_channels}"
             continue
           fi
@@ -255,7 +247,7 @@ spec:
           mv "${ndx_channels}.filtered" "${ndx_channels}"
 
           ### Get packages in the filtered target index
-          mapfile -t ndx_pkgs < <(jq -r '.[].package ' "${ndx_channels}" | sort -u)
+          mapfile -t ndx_pkgs < <(jq -r '.[].package' "${ndx_channels}" | sort -u)
 
           ### No overlapping packages: nothing to prune-check for this version
           if [[ ${#ndx_pkgs[@]} -lt 1 ]]; then
@@ -329,11 +321,19 @@ spec:
           rm -f "${ndx_channels}"
         done
 
-        note="Task $(context.task.name) completed: Check result for task result."
-        if [[ $TESTPASSED == false ]]; then
+        if (( render_error_num > 0 )); then
+          note="Task $(context.task.name) completed with ${render_error_num} OCP version render/index error(s)."
+          if (( failure_num > 0 )); then
+            note="${note} Also found ${failure_num} pruning violation(s)."
+          fi
+          TEST_OUTPUT=$(make_result_json -r ERROR -t "${note}")
+          echo "${TEST_OUTPUT}" | tee "$(results.TEST_OUTPUT.path)"
+        elif [[ $TESTPASSED == false ]]; then
+          note="Task $(context.task.name) completed: Check result for task result."
           ERROR_OUTPUT=$(make_result_json -r FAILURE -f $failure_num -s 0 -t "${note}")
           echo "${ERROR_OUTPUT}" | tee "$(results.TEST_OUTPUT.path)"
         else
+          note="Task $(context.task.name) completed: Check result for task result."
           TEST_OUTPUT=$(make_result_json -r SUCCESS -s 1 -t "${note}")
           echo "${TEST_OUTPUT}" | tee "$(results.TEST_OUTPUT.path)"
         fi
