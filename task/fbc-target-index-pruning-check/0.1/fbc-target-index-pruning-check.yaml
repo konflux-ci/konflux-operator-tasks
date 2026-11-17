@@ -144,7 +144,7 @@ spec:
         ### Resolve OCP version(s): single string (legacy) or JSON array (binaryless)
         ocp_versions_raw=$(get_ocp_version_from_fbc_fragment "${IMAGE_URL}")
         if [[ -z "${ocp_versions_raw}" ]]; then
-          note="Task $(context.task.name) failed: Unable to determine OCP version(s) from FBC fragment."
+          note="Task $(context.task.name) failed: Unable to determine OCP version(s)."
           echo "${note}"
           TEST_OUTPUT=$(make_result_json -r ERROR -t "${note}")
           echo "${TEST_OUTPUT}" | tee "$(results.TEST_OUTPUT.path)"
@@ -326,7 +326,7 @@ spec:
           if (( failure_num > 0 )); then
             note="${note} Also found ${failure_num} pruning violation(s)."
           fi
-          TEST_OUTPUT=$(make_result_json -r ERROR -t "${note}")
+          TEST_OUTPUT=$(make_result_json -r ERROR -f "${failure_num}" -t "${note}")
           echo "${TEST_OUTPUT}" | tee "$(results.TEST_OUTPUT.path)"
         elif [[ $TESTPASSED == false ]]; then
           note="Task $(context.task.name) completed: Check result for task result."
