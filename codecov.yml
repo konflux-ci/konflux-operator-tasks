@@ -14,3 +14,9 @@ coverage:
         informational: true
 
 comment: false
+
+flags:
+  unit-tests:
+    paths:
+      - "!vendor/"
+    carryforward: true
