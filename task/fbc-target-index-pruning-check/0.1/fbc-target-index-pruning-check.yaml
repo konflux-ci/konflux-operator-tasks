@@ -157,7 +157,9 @@ spec:
           ocp_versions=("${ocp_versions_raw}")
         fi
 
-        # Normalize v-prefix, then dedupe (so "4.18" and "v4.18" collapse to one)
+        # LABEL com.redhat.fbc.openshift.version and validate_ocp_version accept both "4.x" and "v4.x".
+        # We enforce the "v" prefix here because target index images (e.g., registry.redhat.io) only
+        # publish v-prefixed tags (e.g., :v4.18).
         mapfile -t ocp_versions < <(
           for v in "${ocp_versions[@]}"; do
             [[ "${v}" == v* ]] || v="v${v}"
@@ -220,6 +222,11 @@ spec:
           echo "Rendering target index: ${target_index_pullspec}"
           # Guard render_opm so set -e does not abort the multi-OCP loop on non-zero exit
           if ! rendered_target_index=$(render_opm -t "${target_index_pullspec}" --file); then
+            echo "!ERROR! - [${ocp_version}] Unable to render the target index image: ${target_index_pullspec}"
+            render_error_num=$((render_error_num + 1))
+            continue
+          fi
+          if [[ ! -f "${rendered_target_index}" ]]; then
             echo "!ERROR! - [${ocp_version}] Unable to render the target index image: ${target_index_pullspec}"
             render_error_num=$((render_error_num + 1))
             continue
@@ -326,7 +333,7 @@ spec:
           if (( failure_num > 0 )); then
             note="${note} Also found ${failure_num} pruning violation(s)."
           fi
-          TEST_OUTPUT=$(make_result_json -r ERROR -f "${failure_num}" -t "${note}")
+          TEST_OUTPUT=$(make_result_json -r ERROR -t "${note}")
           echo "${TEST_OUTPUT}" | tee "$(results.TEST_OUTPUT.path)"
         elif [[ $TESTPASSED == false ]]; then
           note="Task $(context.task.name) completed: Check result for task result."

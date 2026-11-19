@@ -4,7 +4,7 @@
 
 ### Added
 
-- Multi-OCP support for binaryless FBC fragments that declare multiple versions via the `com.redhat.fbc.openshift.version` label (string or JSON array).
+- Multi-OCP support for binaryless FBC fragments that declare multiple versions via the `com.redhat.fbc.openshift.version` label (must be a JSON array, e.g. `["v4.18","v4.19"]`).
 - Per-version pruning checks against each `TARGET_INDEX:<ocp_version>`, with aggregated `TEST_OUTPUT`.
 - Empty-version guard with a clear failure message.
 - Package filtering of released index channels to packages present in the FBC fragment (efficiency).
