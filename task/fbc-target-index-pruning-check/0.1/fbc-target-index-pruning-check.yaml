@@ -11,8 +11,8 @@ spec:
   description: >-
     Ensures file-based catalog (FBC) components do not remove versions of operators already added to a released catalog.
     Supports traditional single-OCP-version fragments and binaryless fragments that target multiple OCP versions
-    via the com.redhat.fbc.openshift.version label. Pruning is allowed only in channels that contain
-    dev-preview, pre-ga, or candidate in their names.
+    via the `com.redhat.fbc.openshift.version` label. Pruning is allowed only in channels that contain
+    `dev-preview`, `pre-ga`, or `candidate` in their names.
   params:
     - name: IMAGE_URL
       description: Fully qualified image name.
@@ -235,7 +235,12 @@ spec:
           ndx_channels="/tmp/olm-channels-target-index-${ocp_version}.json"
 
           ### Filter out channels and channel entries from target index render
-          jq -s 'map(select(.schema == "olm.channel")) | reduce .[] as $obj ([]; . += [{package: $obj.package, channel: $obj.name, entries: [$obj.entries[].name]}])' "${rendered_target_index}" > "${ndx_channels}"
+          if ! jq -s 'map(select(.schema == "olm.channel")) | reduce .[] as $obj ([]; . += [{package: $obj.package, channel: $obj.name, entries: [$obj.entries[].name]}])' "${rendered_target_index}" > "${ndx_channels}"; then
+            echo "!ERROR! - [${ocp_version}] Unable to parse rendered target index: ${target_index_pullspec}"
+            render_error_num=$((render_error_num + 1))
+            rm -f "${rendered_target_index}" "${ndx_channels}"
+            continue
+          fi
           # Free full index render ASAP so multi-OCP loops do not retain N large catalogs in /tmp
           rm -f "${rendered_target_index}"
 
@@ -248,9 +253,14 @@ spec:
           fi
 
           ### Narrow index to packages present in the FBC fragment (full indexes are large)
-          jq --argjson pkgs "${fbc_pkgs_json}" \
+          if ! jq --argjson pkgs "${fbc_pkgs_json}" \
             '[.[] | select(.package as $p | ($pkgs | index($p)) != null)]' \
-            "${ndx_channels}" > "${ndx_channels}.filtered"
+            "${ndx_channels}" > "${ndx_channels}.filtered"; then
+            echo "!ERROR! - [${ocp_version}] Unable to filter target index channels: ${target_index_pullspec}"
+            render_error_num=$((render_error_num + 1))
+            rm -f "${ndx_channels}" "${ndx_channels}.filtered"
+            continue
+          fi
           mv "${ndx_channels}.filtered" "${ndx_channels}"
 
           ### Get packages in the filtered target index
