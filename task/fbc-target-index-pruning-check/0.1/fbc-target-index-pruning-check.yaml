@@ -224,6 +224,8 @@ spec:
           if ! rendered_target_index=$(render_opm -t "${target_index_pullspec}" --file); then
             echo "!ERROR! - [${ocp_version}] Unable to render the target index image: ${target_index_pullspec}"
             render_error_num=$((render_error_num + 1))
+            # render_opm may still print a path to a partial file on failure
+            rm -f "${rendered_target_index}"
             continue
           fi
           if [[ ! -f "${rendered_target_index}" ]]; then
@@ -233,45 +235,47 @@ spec:
           fi
 
           ndx_channels="/tmp/olm-channels-target-index-${ocp_version}.json"
+          filtered_channels_jsonl="/tmp/olm-channels-filtered-${ocp_version}.jsonl"
 
-          ### Filter out channels and channel entries from target index render
-          if ! jq -s 'map(select(.schema == "olm.channel")) | reduce .[] as $obj ([]; . += [{package: $obj.package, channel: $obj.name, entries: [$obj.entries[].name]}])' "${rendered_target_index}" > "${ndx_channels}"; then
+          ### Ensure target index actually contains OLM channels (stream; avoid jq -s)
+          if ! jq -e 'select(.schema == "olm.channel")' "${rendered_target_index}" >/dev/null 2>&1; then
+            echo "!ERROR! - [${ocp_version}] No OLM channels detected in target index."
+            render_error_num=$((render_error_num + 1))
+            rm -f "${rendered_target_index}"
+            continue
+          fi
+
+          ### Stream olm.channel objects and narrow to fragment packages (avoid jq -s on full index)
+          if ! jq -c --argjson pkgs "${fbc_pkgs_json}" '
+            select(.schema == "olm.channel")
+            | select(.package as $p | ($pkgs | index($p)) != null)
+            | {package: .package, channel: .name, entries: [.entries[].name]}
+          ' "${rendered_target_index}" > "${filtered_channels_jsonl}"; then
             echo "!ERROR! - [${ocp_version}] Unable to parse rendered target index: ${target_index_pullspec}"
             render_error_num=$((render_error_num + 1))
-            rm -f "${rendered_target_index}" "${ndx_channels}"
+            rm -f "${rendered_target_index}" "${filtered_channels_jsonl}"
             continue
           fi
           # Free full index render ASAP so multi-OCP loops do not retain N large catalogs in /tmp
           rm -f "${rendered_target_index}"
 
-          ### Ensure target index actually contains OLM channels
+          if ! jq -s '.' "${filtered_channels_jsonl}" > "${ndx_channels}"; then
+            echo "!ERROR! - [${ocp_version}] Unable to materialize filtered target index channels: ${target_index_pullspec}"
+            render_error_num=$((render_error_num + 1))
+            rm -f "${filtered_channels_jsonl}" "${ndx_channels}"
+            continue
+          fi
+          rm -f "${filtered_channels_jsonl}"
+
+          ### No overlapping packages / channels after filter: nothing to prune-check for this version
           if ! jq -e 'length > 0' "${ndx_channels}" >/dev/null 2>&1; then
-            echo "!ERROR! - [${ocp_version}] No OLM channels detected in target index."
-            render_error_num=$((render_error_num + 1))
-            rm -f "${ndx_channels}"
-            continue
-          fi
-
-          ### Narrow index to packages present in the FBC fragment (full indexes are large)
-          if ! jq --argjson pkgs "${fbc_pkgs_json}" \
-            '[.[] | select(.package as $p | ($pkgs | index($p)) != null)]' \
-            "${ndx_channels}" > "${ndx_channels}.filtered"; then
-            echo "!ERROR! - [${ocp_version}] Unable to filter target index channels: ${target_index_pullspec}"
-            render_error_num=$((render_error_num + 1))
-            rm -f "${ndx_channels}" "${ndx_channels}.filtered"
-            continue
-          fi
-          mv "${ndx_channels}.filtered" "${ndx_channels}"
-
-          ### Get packages in the filtered target index
-          mapfile -t ndx_pkgs < <(jq -r '.[].package' "${ndx_channels}" | sort -u)
-
-          ### No overlapping packages: nothing to prune-check for this version
-          if [[ ${#ndx_pkgs[@]} -lt 1 ]]; then
             echo "[${ocp_version}] FBC fragment is not modifying any existing channels in the target index."
             rm -f "${ndx_channels}"
             continue
           fi
+
+          ### Get packages in the filtered target index
+          mapfile -t ndx_pkgs < <(jq -r '.[].package' "${ndx_channels}" | sort -u)
 
           ### Test packages in the FBC fragment that already exist in the target index.
           for pkg in "${ndx_pkgs[@]}"; do

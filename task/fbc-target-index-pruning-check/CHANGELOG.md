@@ -9,6 +9,7 @@
 - Empty-version guard with a clear failure message.
 - Package filtering of released index channels to packages present in the FBC fragment (efficiency).
 - Continue across OCP versions on render/empty-index issues; remove large rendered files after use to reduce memory pressure.
+- Stream target-index channel filtering with `jq -c` (package filter before `jq -s`) so peak memory stays lower on large catalogs; delete partial render paths when `render_opm` fails.
 - Normalize OCP versions with a `v` prefix before building target index pullspecs.
 
 ### Changed
