@@ -10,7 +10,9 @@ metadata:
 spec:
   description: >-
     Ensures file-based catalog (FBC) components do not remove versions of operators already added to a released catalog.
-    Pruning is allowed only in channels that contain dev-preview, pre-ga, or candidate in their names.
+    Supports single OCP version fragments and binaryless fragments that target multiple OCP versions
+    via the `com.redhat.fbc.openshift.version` label. Pruning is allowed only in channels that contain
+    `dev-preview`, `pre-ga`, or `candidate` in their names.
   params:
     - name: IMAGE_URL
       description: Fully qualified image name.
@@ -125,7 +127,7 @@ spec:
         if [ -z "${TARGET_INDEX}" ]; then
           echo "TARGET_INDEX is not defined."
           note="Task $(context.task.name) failed: TARGET_INDEX is not defined."
-          TEST_OUTPUT=$(make_result_json -r ERROR -t "$note")
+          TEST_OUTPUT=$(make_result_json -r ERROR -t "${note}")
           echo "${TEST_OUTPUT}" | tee "$(results.TEST_OUTPUT.path)"
           exit 0
         fi
@@ -135,30 +137,57 @@ spec:
           note="Task $(context.task.name) failed: Rendered FBC fragment does not exist: ${rendered_fbc_image}"
           echo "${note}"
           TEST_OUTPUT=$(make_result_json -r ERROR -t "${note}")
+          echo "${TEST_OUTPUT}" | tee "$(results.TEST_OUTPUT.path)"
           exit 0
         fi
 
-        ### Run opm render for target index
-        ocp_version=$(get_ocp_version_from_fbc_fragment "${IMAGE_URL}")
-        target_index_pullspec="${TARGET_INDEX}:${ocp_version}"
-        echo "Rendering target index: ${target_index_pullspec}"
-        rendered_target_index=$(render_opm -t "${target_index_pullspec}" --file)
-        if [[ ! -f "${rendered_target_index}" ]]; then
-          note="Task $(context.task.name) failed: Unable to render the fragment target index image: ${IMAGE_URL}"
+        ### Resolve OCP version(s): single string (legacy) or JSON array (binaryless)
+        ocp_versions_raw=$(get_ocp_version_from_fbc_fragment "${IMAGE_URL}")
+        if [[ -z "${ocp_versions_raw}" ]]; then
+          note="Task $(context.task.name) failed: Unable to determine OCP version(s)."
           echo "${note}"
           TEST_OUTPUT=$(make_result_json -r ERROR -t "${note}")
+          echo "${TEST_OUTPUT}" | tee "$(results.TEST_OUTPUT.path)"
           exit 0
         fi
 
+        if jq -e 'type == "array"' >/dev/null 2>&1 <<<"${ocp_versions_raw}"; then
+          mapfile -t ocp_versions < <(jq -r '.[]' <<<"${ocp_versions_raw}")
+        else
+          ocp_versions=("${ocp_versions_raw}")
+        fi
+
+        # LABEL com.redhat.fbc.openshift.version and validate_ocp_version accept both "4.x" and "v4.x".
+        # We enforce the "v" prefix here because target index images (e.g., registry.redhat.io) only
+        # publish v-prefixed tags (e.g., :v4.18).
+        mapfile -t ocp_versions < <(
+          for v in "${ocp_versions[@]}"; do
+            [[ "${v}" == v* ]] || v="v${v}"
+            # Empty entries normalize to bare "v"; drop them so the empty-list guard fires
+            [[ "${v}" =~ ^v$ ]] && continue
+            printf '%s\n' "${v}"
+          done | sort -u
+        )
+
+        if (( ${#ocp_versions[@]} < 1 )); then
+          note="Task $(context.task.name) failed: Parsed OCP version list is empty."
+          echo "${note}"
+          TEST_OUTPUT=$(make_result_json -r ERROR -t "${note}")
+          echo "${TEST_OUTPUT}" | tee "$(results.TEST_OUTPUT.path)"
+          exit 0
+        fi
+
+        echo "OCP versions to check: ${ocp_versions[*]}"
+
         failure_num=0
+        render_error_num=0
         TESTPASSED=true
         # Allowed pruned channels are those that contain dev-preview, pre-ga, or candidate anywhere in their names
         fbc_allowed_pruned_channels=".*(dev-preview|pre-ga|candidate).*"
 
         fbc_channels=/tmp/olm-channels-fbc-image.json
-        ndx_channels=/tmp/olm-channels-target-index.json
 
-        ### Filter out channels and channel entries from FBC fragment render
+        ### Filter out channels and channel entries from FBC fragment render (once)
         jq -s 'map(select(.schema == "olm.channel")) | reduce .[] as $obj ([]; . += [{package: $obj.package, channel: $obj.name, entries: [$obj.entries[].name]}])' "${rendered_fbc_image}" > "${fbc_channels}"
 
         echo ""
@@ -166,52 +195,122 @@ spec:
         jq '.' "${fbc_channels}"
         echo ""
 
-        ### Filter out channels and channel entries from target index render
-        jq -s 'map(select(.schema == "olm.channel")) | reduce .[] as $obj ([]; . += [{package: $obj.package, channel: $obj.name, entries: [$obj.entries[].name]}])' "${rendered_target_index}" > "${ndx_channels}"
-
         ### Get the package(s) the fragment is configuring
-        mapfile -t fbc_pkgs < <(jq -r '.[].package ' "${fbc_channels}" | sort -u)
+        mapfile -t fbc_pkgs < <(jq -r '.[].package' "${fbc_channels}" | sort -u)
         if (( ${#fbc_pkgs[@]} < 1 )); then
           note="Task $(context.task.name) failed: No OLM packages detected in FBC fragment."
           echo "${note}"
           TEST_OUTPUT=$(make_result_json -r ERROR -t "${note}")
+          echo "${TEST_OUTPUT}" | tee "$(results.TEST_OUTPUT.path)"
           exit 0
         fi
 
-        ### Get packages in target index
-        mapfile -t ndx_pkgs < <(jq -r '.[].package ' "${ndx_channels}" | sort -u)
-        if [[ ${#ndx_pkgs[@]} -lt 1 ]]; then
-          note="Task $(context.task.name) failed: No OLM packages detected in target index."
-          echo "${note}"
-          TEST_OUTPUT=$(make_result_json -r ERROR -t "${note}")
-          exit 0
-        fi
-
-        ### Test packages in the FBC fragment that already exist in the target index.
-        pkgs_to_test=()
+        ### Cache fragment channel names per package (reuse across OCP versions)
+        declare -A fbc_channel_names_by_pkg
         for pkg in "${fbc_pkgs[@]}"; do
-          if echo "${ndx_pkgs[@]}" | grep -Fwq "${pkg}"; then
-            pkgs_to_test+=("${pkg}")
-          fi
+          fbc_channel_names_by_pkg["${pkg}"]="$(jq -r --arg p "${pkg}" '.[] | select(.package == $p) | .channel' "${fbc_channels}")"
         done
 
-        if (( ${#pkgs_to_test[@]} > 0 )); then
-          for pkg in "${pkgs_to_test[@]}"; do
+        fbc_pkgs_json=$(printf '%s\n' "${fbc_pkgs[@]}" | jq -R . | jq -s -c .)
+
+        ### For each OCP version, render that version's target index and run the pruning comparison
+        # Continue across versions so all render/pruning issues are reported together.
+        # ERROR = render/empty-index (infra); FAILURE = pruning policy violations.
+        for ocp_version in "${ocp_versions[@]}"; do
+          echo ""
+          echo "=== Checking pruning against OCP version: ${ocp_version} ==="
+
+          target_index_pullspec="${TARGET_INDEX}:${ocp_version}"
+          echo "Rendering target index: ${target_index_pullspec}"
+          # Guard render_opm so set -e does not abort the multi-OCP loop on non-zero exit
+          if ! rendered_target_index=$(render_opm -t "${target_index_pullspec}" --file); then
+            echo "!ERROR! - [${ocp_version}] Unable to render the target index image: ${target_index_pullspec}"
+            render_error_num=$((render_error_num + 1))
+            # render_opm may still print a path to a partial file on failure
+            [[ -n "${rendered_target_index}" ]] && rm -f "${rendered_target_index}"
+            continue
+          fi
+          if [[ ! -f "${rendered_target_index}" ]]; then
+            echo "!ERROR! - [${ocp_version}] Unable to render the target index image: ${target_index_pullspec}"
+            render_error_num=$((render_error_num + 1))
+            continue
+          fi
+
+          ndx_channels="/tmp/olm-channels-target-index-${ocp_version}.json"
+          filtered_channels_jsonl="/tmp/olm-channels-filtered-${ocp_version}.jsonl"
+
+          ### Ensure target index actually contains OLM channels (stream; avoid jq -s).
+          # Do not use `jq -e 'select(...)'` over the whole stream: -e uses the *last*
+          # result, so a trailing non-channel object makes jq exit non-zero even when
+          # channels exist earlier (typical for pretty-printed `opm render` output).
+          # Disable pipefail in a subshell: under set -o pipefail, `grep -q` exiting
+          # after the first match can SIGPIPE jq (exit 141) and false-trigger this ERROR
+          # on real indexes with many olm.channel objects.
+          if ! (set +o pipefail; jq -c 'select(.schema == "olm.channel")' "${rendered_target_index}" | grep -q .); then
+            echo "!ERROR! - [${ocp_version}] No OLM channels detected in target index."
+            render_error_num=$((render_error_num + 1))
+            rm -f "${rendered_target_index}"
+            continue
+          fi
+
+          ### Stream olm.channel objects and narrow to fragment packages (avoid jq -s on full index)
+          if ! jq -c --argjson pkgs "${fbc_pkgs_json}" '
+            select(.schema == "olm.channel")
+            | select(.package as $p | ($pkgs | index($p)) != null)
+            | {package: .package, channel: .name, entries: [.entries[].name]}
+          ' "${rendered_target_index}" > "${filtered_channels_jsonl}"; then
+            echo "!ERROR! - [${ocp_version}] Unable to parse rendered target index: ${target_index_pullspec}"
+            render_error_num=$((render_error_num + 1))
+            rm -f "${rendered_target_index}" "${filtered_channels_jsonl}"
+            continue
+          fi
+          # Free full index render ASAP so multi-OCP loops do not retain N large catalogs in /tmp
+          rm -f "${rendered_target_index}"
+
+          if ! jq -s '.' "${filtered_channels_jsonl}" > "${ndx_channels}"; then
+            echo "!ERROR! - [${ocp_version}] Unable to materialize filtered target index channels: ${target_index_pullspec}"
+            render_error_num=$((render_error_num + 1))
+            rm -f "${filtered_channels_jsonl}" "${ndx_channels}"
+            continue
+          fi
+          rm -f "${filtered_channels_jsonl}"
+
+          ### No overlapping packages / channels after filter: nothing to prune-check for this version
+          if ! jq -e 'length > 0' "${ndx_channels}" >/dev/null 2>&1; then
+            echo "[${ocp_version}] FBC fragment is not modifying any existing channels in the target index."
+            rm -f "${ndx_channels}"
+            continue
+          fi
+
+          ### Get packages in the filtered target index
+          mapfile -t ndx_pkgs < <(jq -r '.[].package' "${ndx_channels}" | sort -u)
+
+          ### Test packages in the FBC fragment that already exist in the target index.
+          for pkg in "${ndx_pkgs[@]}"; do
             channels_to_test=()
-            mapfile -t fbc_channel_names < <(jq -r --arg p "${pkg}" '.[] | select(.package == $p) | .channel' ${fbc_channels})
-            mapfile -t ndx_channel_names < <(jq -r --arg p "${pkg}" '.[] | select(.package == $p) | .channel' ${ndx_channels})
+            mapfile -t fbc_channel_names < <(printf '%s\n' "${fbc_channel_names_by_pkg["${pkg}"]}")
+            mapfile -t ndx_channel_names < <(jq -r --arg p "${pkg}" '.[] | select(.package == $p) | .channel' "${ndx_channels}")
 
             ### Check for removed channels
+            # Exact string compare (no printf|grep): under set -o pipefail, grep -q + SIGPIPE
+            # can spuriously treat a retained channel/entry as pruned on large lists.
             for chan in "${ndx_channel_names[@]}"; do
-              if echo "${fbc_channel_names[@]}" | grep -Fwq "${chan}"; then
+              channel_present=false
+              for fbc_chan in "${fbc_channel_names[@]}"; do
+                if [[ "${fbc_chan}" == "${chan}" ]]; then
+                  channel_present=true
+                  break
+                fi
+              done
+              if [[ "${channel_present}" == true ]]; then
                 channels_to_test+=("${chan}")
               else
                 if [[ ! "${chan}" =~ ${fbc_allowed_pruned_channels} ]]; then
-                  echo "!FAILURE! - FBC fragment prunes entire ${pkg}.${chan} channel."
+                  echo "!FAILURE! - [${ocp_version}] FBC fragment prunes entire ${pkg}.${chan} channel."
                   TESTPASSED=false
                   failure_num=$((failure_num + 1))
                 else
-                  echo "FBC fragment prunes entire ${pkg}.${chan} channel. Pruning in ${chan} channel is allowed."
+                  echo "[${ocp_version}] FBC fragment prunes entire ${pkg}.${chan} channel. Pruning in ${chan} channel is allowed."
                 fi
               fi
             done
@@ -220,35 +319,50 @@ spec:
             if (( ${#channels_to_test[@]} > 0 )); then
               for chan in "${channels_to_test[@]}"; do
                 echo ""
-                echo "TARGET INDEX ${pkg}.${chan} channel:"
+                echo "[${ocp_version}] TARGET INDEX ${pkg}.${chan} channel:"
                 jq -r --arg p "${pkg}" --arg c "${chan}" '.[] | select(.package == $p and .channel == $c)' "${ndx_channels}"
                 echo ""
                 mapfile -t ndx_entries < <(jq -r --arg p "${pkg}" --arg c "${chan}" '.[] | select(.package == $p and .channel == $c) | .entries[]' "${ndx_channels}")
                 mapfile -t fbc_entries < <(jq -r --arg p "${pkg}" --arg c "${chan}" '.[] | select(.package == $p and .channel == $c) | .entries[]' "${fbc_channels}")
 
                 for entry in "${ndx_entries[@]}"; do
-                  if ! echo "${fbc_entries[@]}" | grep -Fwq "${entry}"; then
+                  entry_present=false
+                  for fbc_entry in "${fbc_entries[@]}"; do
+                    if [[ "${fbc_entry}" == "${entry}" ]]; then
+                      entry_present=true
+                      break
+                    fi
+                  done
+                  if [[ "${entry_present}" != true ]]; then
                     if [[ ! "${chan}" =~ ${fbc_allowed_pruned_channels} ]]; then
-                      echo "!FAILURE! - FBC fragment prunes ${entry} from ${pkg}.${chan} channel."
+                      echo "!FAILURE! - [${ocp_version}] FBC fragment prunes ${entry} from ${pkg}.${chan} channel."
                       failure_num=$((failure_num + 1))
                       TESTPASSED=false
                     else
-                      echo "FBC fragment prunes ${entry} from ${pkg}.${chan} channel. Pruning in ${chan} channel is allowed."
+                      echo "[${ocp_version}] FBC fragment prunes ${entry} from ${pkg}.${chan} channel. Pruning in ${chan} channel is allowed."
                     fi
                   fi
                 done
               done
             fi
           done
-        else
-          echo "FBC fragment is not modifying any existing channels in the target index."
-        fi
 
-        note="Task $(context.task.name) completed: Check result for task result."
-        if [[ $TESTPASSED == false ]]; then
+          rm -f "${ndx_channels}"
+        done
+
+        if (( render_error_num > 0 )); then
+          note="Task $(context.task.name) completed with ${render_error_num} OCP version render/index error(s)."
+          if (( failure_num > 0 )); then
+            note="${note} Also found ${failure_num} pruning violation(s)."
+          fi
+          TEST_OUTPUT=$(make_result_json -r ERROR -t "${note}")
+          echo "${TEST_OUTPUT}" | tee "$(results.TEST_OUTPUT.path)"
+        elif [[ $TESTPASSED == false ]]; then
+          note="Task $(context.task.name) completed: Check result for task result."
           ERROR_OUTPUT=$(make_result_json -r FAILURE -f $failure_num -s 0 -t "${note}")
           echo "${ERROR_OUTPUT}" | tee "$(results.TEST_OUTPUT.path)"
         else
+          note="Task $(context.task.name) completed: Check result for task result."
           TEST_OUTPUT=$(make_result_json -r SUCCESS -s 1 -t "${note}")
           echo "${TEST_OUTPUT}" | tee "$(results.TEST_OUTPUT.path)"
         fi
@@ -259,6 +373,7 @@ spec:
         images_processed_template='{"image": {"pullspec": "'"$IMAGE_URL"'", "digests": [%s]}}'
         image_manifests=$(get_image_manifests -i "${image_with_digest}")
         echo "image_manifests: $image_manifests"
+        digests_processed=()
         if [ -n "$image_manifests" ]; then
           while read -r _arch arch_sha; do
             digests_processed+=("\"$arch_sha\"")
