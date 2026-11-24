@@ -114,6 +114,25 @@ Other `*-oci-ta` tasks are **standalone** — they have no base task and no `rec
 - Use power-of-two memory values (64Mi, 128Mi, 256Mi, etc.). When the analyzer maximum does not align to a power-of-two, round up to the next boundary.
 - The CHANGELOG must accurately describe the sizing rule used. If values are rounded up from analyzer output, state the rounding convention (e.g., "rounded to next power-of-two") rather than claiming a different formula.
 
+## Bash pitfalls in task step scripts
+
+Task steps run under `set -euo pipefail`. Two common within-step pitfalls:
+
+### SIGPIPE with `grep -q` under pipefail
+
+Do not use `cmd | grep -q pattern` under `set -o pipefail`. `grep -q` closes stdin after the first match, sending SIGPIPE (exit 141) to the upstream command and failing the pipeline. Use `cmd | grep pattern > /dev/null` instead.
+
+### `set -e` with command substitution in loops
+
+`result=$(failing_command)` triggers `set -e` and exits the script immediately — the loop does not continue to remaining items. Guard with:
+
+```bash
+if ! result=$(command 2>&1); then
+  handle_error "$result"
+  continue
+fi
+```
+
 ## CI checks
 
 YAML lint, Checkton, ShellSpec, Tekton integration tests, Go tests (task-generator), and migration validation all run on PRs. Check `.github/workflows/` for details.
