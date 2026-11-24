@@ -12,7 +12,7 @@ PRs created by the fullsend pipeline use GitHub issue references instead (e.g., 
 
 ## Testing
 
-Every change to a task **must** include or update tests. Two testing layers exist:
+Every change to a task **must** include or update tests. At minimum, ShellSpec unit tests are required for any logic change. Two testing layers exist — use whichever layers are appropriate for the change:
 
 ### ShellSpec (unit tests)
 
@@ -27,6 +27,8 @@ Every change to a task **must** include or update tests. Two testing layers exis
 - Setup hook: `tests/pre-apply-task-hook.sh` creates required k8s resources
 - Runs in CI via `.github/scripts/test_tekton_tasks.sh` on a Kind cluster
 - Use annotation `test/assert-task-failure` to test expected failures
+
+**Choosing the right layer:** ShellSpec unit tests are sufficient for changes confined to step-internal logic (new code paths, error handling, input validation). Tekton integration tests are required when the change affects task-level behavior visible to the pipeline — new parameters, changed results schema, new workspace requirements, or modified step ordering.
 
 ### Running tests
 
