@@ -173,9 +173,11 @@ spec:
         # are not yet fixed are exempt from this task until their data is
         # corrected.
         # Remove entries once data remediation in PLMCORE-16364 is complete and validated.
-        # Exceptions for Tech Preview operators are tracked in PLMCORE-17472
+        # Exceptions for Tech Preview and Dev Preview operators for 5.0 are tracked in PLMCORE-17472
         # (https://redhat.atlassian.net/browse/PLMCORE-17472).
-        SKIP_PACKAGES="ocs-tls-profiles,odf-external-snapshotter-operator,odr-volsync-plugin-operator,pf-status-relay-operator,model-validation-operator,agent-sandbox-operator,vcf-migration-operator,openperouter-operator"
+        # Exceptions for Tech Preview and Dev Preview operators for 5.1 are tracked in PLMCORE-18158
+        # (https://redhat.atlassian.net/browse/PLMCORE-18158).
+        SKIP_PACKAGES="ocs-tls-profiles,odf-external-snapshotter-operator,odr-volsync-plugin-operator,pf-status-relay-operator,model-validation-operator,agent-sandbox-operator,vcf-migration-operator,openperouter-operator,o-cloud-manager,cluster-power-manager"
 
         operator-foundry fbc get-packages \
           --dockerfile "${DOCKERFILE}" \
