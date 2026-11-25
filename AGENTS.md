@@ -78,6 +78,17 @@ Some tasks have multiple version directories (e.g., `task/foo/0.1/` and `0.2/`).
 3. **Check `CHANGELOG.md`** to understand the relationship between versions and whether divergence is intentional.
 4. **Update documentation across all versions.** Keep `README.md` and any other docs in sync when the underlying behavior changes.
 
+### When to create a new version
+
+If a change to a task is backward-incompatible, create a new version directory (e.g., `task/foo/0.4/`) rather than modifying the existing version. This preserves backward compatibility for callers pinned to the current bundle digest. A change is backward-incompatible if it meets **any** of the following criteria:
+
+1. **Adding required parameters.** New parameters with no default value that existing pipeline callers do not pass. Adding an optional parameter (one with a default) is safe in the current version.
+2. **Changing inter-step contracts.** Adding or removing steps that alter how the task communicates between steps — e.g., modifying which steps write to shared volumes, changing `TEST_OUTPUT` semantics, or reordering steps that depend on each other's outputs.
+3. **Removing or changing outputs.** Removing a result, renaming it, or changing its format in a way that downstream consumers (pipelines, other tasks) depend on. This includes changing success-path behavior — e.g., a step that previously wrote `TEST_OUTPUT` on the happy path no longer doing so.
+4. **Embedding a different delivery mechanism.** Adding OCI trusted-artifact steps to a workspace-based task, or vice versa, changes the task's operational model and requires callers to provide different infrastructure (e.g., `SOURCE_ARTIFACT` parameter, trusted-artifact volumes).
+
+When creating the new version, copy the current version directory as the starting point and apply changes there. Update the task's top-level `CHANGELOG.md` to document the new version and what changed.
+
 ## Workspace/OCI-TA variant consistency
 
 Some tasks exist as both a workspace variant (PVC-based) and an OCI-TA variant (trusted-artifact-based), e.g., `fbc-fips-check` and `fbc-fips-check-oci-ta`. When creating or modifying a task that has a variant counterpart:
