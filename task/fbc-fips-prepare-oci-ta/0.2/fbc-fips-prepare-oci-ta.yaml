@@ -1,0 +1,611 @@
+---
+# Task: Prepare images for parallel FIPS checking (binaryless, multi-version)
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: fbc-fips-prepare-oci-ta
+  annotations:
+    tekton.dev/pipelines.minVersion: 0.12.1
+    tekton.dev/tags: konflux
+  labels:
+    app.kubernetes.io/version: "0.2"
+spec:
+  description: |-
+    Prepare images for parallel FIPS checking by extracting, deduplicating, and distributing across per-version buckets.
+    This is the binaryless variant: the target OCP versions are read from the `com.redhat.fbc.openshift.version` label
+    (a list of versions) rather than being derived from a base image. Each targeted OCP version is processed
+    independently - unreleased bundles are resolved against that version's index and the surviving relatedImages are
+    grouped per version. The images are then split into buckets per version so that `fbc-fips-check-matrix-based-oci-ta`
+    can fan out a 2-dimensional matrix (OCP version x bucket index) where each branch scans its bucket with that
+    version's check-payload exception set. Binaryless FBC fragments are only permitted for OCP versions >= v4.15.
+  params:
+    - name: SOURCE_ARTIFACT
+      description: The Trusted Artifact URI pointing to the artifact with the application source code
+      type: string
+    - name: image-digest
+      description: Image digest to scan
+    - name: image-url
+      description: Image URL
+    - name: image-mirror-set-path
+      description: Path to the image mirror set file.
+      type: string
+      default: .tekton/images-mirror-set.yaml
+    - name: ociStorage
+      description: The OCI repository where the Trusted Artifacts are stored
+      type: string
+    - name: NUM_BUCKETS
+      description: Number of buckets to create per OCP version (grid width)
+      type: string
+      default: "1"
+    - name: SIZE_FETCH_PARALLEL
+      description: Number of parallel image size fetches for load balancing
+      type: string
+      default: "5"
+  results:
+    - name: BUCKETS_ARTIFACT
+      description: OCI reference to buckets artifact
+      type: string
+    - name: BUCKET_INDICES
+      description: Array of bucket indices for matrix expansion (grid width)
+      type: array
+    - name: OCP_VERSIONS
+      description: Array of target OCP versions for matrix expansion
+      type: array
+    - name: TOTAL_IMAGES
+      description: Total number of (image, version) pairs to scan
+      type: string
+  volumes:
+    - name: tmp
+      emptyDir: {}
+    - name: workdir
+      emptyDir: {}
+  stepTemplate:
+    volumeMounts:
+      - mountPath: /var/workdir
+        name: workdir
+  steps:
+    - name: use-trusted-artifact
+      image: quay.io/konflux-ci/build-trusted-artifacts:latest@sha256:a246cf2267fe6fa68ae8885c6ca4141923edca3ccf9b56838d1ebe369d31b46d
+      args:
+        - use
+        - $(params.SOURCE_ARTIFACT)=/var/workdir/source
+    - name: get-unique-related-images
+      image: quay.io/konflux-ci/konflux-test:v1.5.9@sha256:7faaebc542c61704003fecbab81a9c81c9770b4df8c5bba18459fba3f58e9c51
+      env:
+        - name: HOME
+          value: /tmp
+        - name: IMAGE_URL
+          value: $(params.image-url)
+        - name: IMAGE_DIGEST
+          value: $(params.image-digest)
+        - name: SOURCE_CODE_DIR
+          value: /var/workdir
+        - name: IMAGE_MIRROR_SET_PATH
+          value: $(params.image-mirror-set-path)
+      script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+        # shellcheck source=/dev/null
+        . /utils.sh
+        echo "Using binaryless multi-version prepare (task version 0.2)."
+
+        images_processed_template='{"image": {"pullspec": "'"$IMAGE_URL"'", "digests": [%s]}}'
+
+        fail() {
+          # $1 = result type (FAILURE|ERROR), $2 = note
+          local note="$2"
+          echo "${note}"
+          local test_output
+          if [ "$1" == "ERROR" ]; then
+            test_output=$(make_result_json -r ERROR -t "${note}")
+          else
+            test_output=$(make_result_json -r FAILURE -f 1 -t "${note}")
+          fi
+          echo "${test_output}" > /tekton/home/test_output.txt
+          exit 0
+        }
+
+        image_mirror_map=""
+        mirror_set="${SOURCE_CODE_DIR}/source/${IMAGE_MIRROR_SET_PATH}"
+        if [[ -f "${mirror_set}" ]]; then
+          mirror_set_yaml=$(cat "${mirror_set}")
+          image_mirror_map=$(process_image_digest_mirror_set "${mirror_set_yaml}")
+          echo "${image_mirror_map}" >"/tekton/home/related-images-map.txt"
+          echo "Image mirror map:"
+          echo "${image_mirror_map}" | jq '.'
+        else
+          echo "Could not find Image mirror set at ${mirror_set}. Unreleased bundles and relatedImages will fail the scan."
+        fi
+
+        image_without_tag=$(echo -n "${IMAGE_URL}" | sed "s/\(.*\):.*/\1/")
+        # strip new-line escape symbol from parameter and save it to variable
+        image_and_digest="${image_without_tag}@${IMAGE_DIGEST}"
+
+        echo "Inspecting raw image manifest $image_and_digest."
+        # Get the arch and image manifests by inspecting the image. This is mainly for identifying image indexes
+        image_manifests=$(get_image_manifests -i "${image_and_digest}")
+        echo "Image manifests are $image_manifests"
+
+        # Collect the fragment's per-arch digests once - this is version independent.
+        declare -a arch_shas=()
+        declare -a digests_processed=()
+        while read -r _ arch_sha; do
+          arch_shas+=("${arch_sha}")
+          digests_processed+=("\"${arch_sha}\"")
+        done < <(echo "$image_manifests" | jq -r 'to_entries[] | "\(.key) \(.value)"')
+
+        # Binaryless: read the list of target OCP versions from the
+        # 'com.redhat.fbc.openshift.version' label, e.g. ["v4.15","v4.16"].
+        echo "Getting target OCP versions for the binaryless FBC fragment"
+        image_manifest_sha=$(echo "${image_manifests}" | jq -r 'to_entries[0].value')
+        ocp_version_raw=$(get_ocp_version_from_fbc_fragment "$image_without_tag@$image_manifest_sha")
+        echo "OCP versions from label: ${ocp_version_raw}"
+
+        # get_ocp_version_from_fbc_fragment only returns a JSON array when the
+        # 'com.redhat.fbc.openshift.version' label is present. If the label is missing, it falls
+        # back to a plain version string derived from the base image, which this binaryless task
+        # does not support.
+        if ! echo "${ocp_version_raw}" | jq -e 'type == "array"' >/dev/null 2>&1; then
+          fail FAILURE "Task $(context.task.name) failed: The 'com.redhat.fbc.openshift.version' label was not found on the FBC fragment (or does not contain a JSON array of versions). This task only supports binaryless FBC fragments that declare their target OCP versions via that label."
+        fi
+
+        OCP_VERSIONS=$(echo "${ocp_version_raw}" | jq -r '.[]' | sed 's/^v//' | sort -V | uniq | xargs)
+        if [[ -z "${OCP_VERSIONS}" ]]; then
+          fail FAILURE "Task $(context.task.name) failed: Could not read any target OCP version from the 'com.redhat.fbc.openshift.version' label. This task only supports binaryless FBC fragments."
+        fi
+
+        min_version=$(echo "${OCP_VERSIONS}" | tr ' ' '\n' | head -n1)
+        if [[ $(echo -e "4.15\n${min_version}" | sort -V | head -n1) != "4.15" ]]; then
+          fail FAILURE "Task $(context.task.name) failed: Binaryless FBC fragments must target OCP version >= v4.15, but the 'com.redhat.fbc.openshift.version' label contains ${min_version}."
+        fi
+        echo "Target OCP versions: ${OCP_VERSIONS}"
+
+        # Render the FBC fragment once; its package list is identical regardless of target OCP version.
+        echo "Rendering FBC fragment: ${image_and_digest}"
+        rendered_fbc_image_file=$(render_opm -t "${image_and_digest}" --file)
+        if [[ ! -f "${rendered_fbc_image_file}" ]]; then
+          fail ERROR "Task $(context.task.name) failed: Unable to render the FBC fragment image: ${image_and_digest}"
+        fi
+        echo "Getting package names in FBC fragment"
+        if ! fragment_pkg_names=$(extract_unique_package_names_from_catalog "${rendered_fbc_image_file}" --file); then
+          fail FAILURE "Task $(context.task.name) failed: Could not get package names from FBC fragment."
+        fi
+        echo "Packages in FBC fragment: ${fragment_pkg_names}"
+
+        # map: bundle -> FIPS scan decision ("SKIP" or "SCAN"), version independent so evaluated once
+        declare -A bundle_scan_decision_map
+        # map: bundle -> its related images (only for bundles decided "SCAN")
+        declare -A bundle_related_images_map
+        # map: OCP version -> related images that need scanning for that version
+        declare -A ocp_version_related_images_map
+
+        for ocp_version in ${OCP_VERSIONS}; do
+          echo "==================== Processing OCP version ${ocp_version} ===================="
+
+          # Resolve this version's target index, falling back to the previous version's index
+          # if the fragment introduces packages that aren't released in this version yet.
+          target_index_url="registry.redhat.io/redhat/redhat-operator-index:v${ocp_version}"
+          echo "Target index for OCP ${ocp_version}: ${target_index_url}"
+          target_index_repo_reg=$(get_image_registry_and_repository "${target_index_url}")
+
+          echo "Rendering target index: ${target_index_url}"
+          rendered_target_index_file=$(render_opm -t "${target_index_url}" --file)
+          if [[ ! -f "${rendered_target_index_file}" ]]; then
+            fail ERROR "Task $(context.task.name) failed: Unable to render the fragment target index image: ${target_index_url}"
+          fi
+
+          if ! ti_pkg_names=$(extract_unique_package_names_from_catalog "${rendered_target_index_file}" --file); then
+            fail FAILURE "Task $(context.task.name) failed: Could not get package names from the target index."
+          fi
+
+          declare -i unreleased_pkg_count=0
+          for pkg in ${fragment_pkg_names}; do
+            if ! echo "${ti_pkg_names}" | grep -Fwq "${pkg}"; then
+              unreleased_pkg_count+=1
+              echo "${pkg} was not found in target index ${target_index_url}."
+            fi
+          done
+
+          if [[ "${unreleased_pkg_count}" -gt 0 ]]; then
+            echo "One or more packages in the FBC fragment were not found in the target index ${target_index_url}."
+            prev_ocp_version=$(get_prev_ocp_version "v${ocp_version}")
+            echo "Using the previous catalog OCP version to check for unreleased bundles: ${prev_ocp_version}"
+            target_index_url="${target_index_repo_reg}:${prev_ocp_version}"
+          fi
+          echo "Resolved previous index for OCP ${ocp_version}: ${target_index_url}"
+
+          # Find the unreleased bundles for this version across all fragment arches.
+          for arch_sha in "${arch_shas[@]}"; do
+            if ! unreleased_bundles=$(get_unreleased_bundle -i "$image_without_tag@$arch_sha" -b "$target_index_url"); then
+              fail FAILURE "Task $(context.task.name) failed: Could not get unreleased bundle images from the fragment. Make sure you have ImagePullCredentials for registry.redhat.io"
+            fi
+
+            if [ -z "${unreleased_bundles}" ]; then
+              echo "No unreleased bundles found for OCP ${ocp_version} (arch ${arch_sha})."
+              continue
+            fi
+
+            for bundle in ${unreleased_bundles}; do
+              # Evaluate each bundle once (decision + relatedImages are version independent).
+              if [ -z "${bundle_scan_decision_map["$bundle"]:-}" ]; then
+                echo "Processing bundle image : ${bundle}"
+                render_ref="${bundle}"
+
+                image_accessible=0
+                if ! bundle_out=$(opm render "$render_ref"); then
+                  echo "Could not inspect original pullspec $render_ref. Checking if there's a mirror present"
+                  if [ -n "${image_mirror_map}" ]; then
+                    reg_and_repo=$(get_image_registry_and_repository "${render_ref}")
+                    mapfile -t mirrors < <(get_image_mirror_list "${reg_and_repo}" "${image_mirror_map}")
+                    if [[ -z "${mirrors[0]}" ]]; then
+                      echo "No mirrors found in image mirror map for ${reg_and_repo}"
+                    else
+                      echo "Mirrors for $reg_and_repo are:"
+                      printf "%s\n" "${mirrors[@]}"
+
+                      for mirror in "${mirrors[@]}"; do
+                        echo "Attempting to use mirror ${mirror}"
+                        replaced_image=$(replace_image_pullspec "$render_ref" "$mirror")
+                        if ! bundle_out=$(opm render "$replaced_image"); then
+                          echo "Mirror $mirror is inaccessible."
+                          continue
+                        fi
+                        image_accessible=1
+                        echo "Replacing $render_ref with $replaced_image"
+                        render_ref="$replaced_image"
+                        break
+                      done
+                    fi
+                  fi
+                else
+                  image_accessible=1
+                  echo "Successfully inspected $render_ref. Mirror not required."
+                fi
+
+                if [[ $image_accessible -eq 0 ]]; then
+                  fail FAILURE "Task $(context.task.name) failed: Could not render unreleased bundle image: ${bundle}. Make sure the image is accessible or a mirror is provided for the same in images-mirror-set.yaml"
+                fi
+
+                subscription_label=$(echo "${bundle_out}" | jq -r '.properties[] | select((.value | type == "object") and (.value.annotations["operators.openshift.io/valid-subscription"] != null)) | (.value.annotations["operators.openshift.io/valid-subscription"] | fromjson)[]')
+
+                fips_annotation=$(echo "${bundle_out}" | jq -r '.properties[] | select((.value | type == "object") and (.value.annotations["features.operators.openshift.io/fips-compliant"]? == "true")) | .value.annotations["features.operators.openshift.io/fips-compliant"]')
+
+                # Extract createdAt annotation for FIPS exemption check
+                created_at=$(echo "${bundle_out}" | jq -r '.properties[] | select((.value | type == "object") and (.value.annotations["createdAt"] != null)) | .value.annotations["createdAt"]' | head -1)
+
+                # FIPS requirement cutoff date (Jan 31, 2025) - bundles created before this date
+                # with qualifying subscriptions are exempt from FIPS checks unless they explicitly
+                # claim fips-compliant=true
+                FIPS_CUTOFF_DATE="2025-01-31T00:00:00Z"
+                # Pre-computed epoch seconds for FIPS_CUTOFF_DATE to avoid runtime date parsing issues
+                FIPS_CUTOFF_EPOCH=1738281600
+
+                decision="SCAN"
+                if ! echo "${subscription_label}" | grep -e "OpenShift Kubernetes Engine" -e "OpenShift Container Platform" -e "OpenShift Platform Plus"; then
+                  echo "OpenShift Kubernetes Engine, OpenShift Platform Plus or OpenShift Container Platform are not present in operators.openshift.io/valid-subscription."
+                  echo "Subscription labels are : $subscription_label"
+                  if [ -z "${fips_annotation}" ] || [ "${fips_annotation}" != "true" ]; then
+                    echo "The annotation features.operators.openshift.io/fips-compliant is also not set to true. Skipping the FIPS static check for ${bundle}"
+                    decision="SKIP"
+                  else
+                    echo "The annotation features.operators.openshift.io/fips-compliant is set to true. Running the FIPS static check..."
+                  fi
+                else
+                  # Bundle has qualifying Red Hat subscription
+                  echo "OpenShift Kubernetes Engine, OpenShift Platform Plus or OpenShift Container Platform are present in operators.openshift.io/valid-subscription."
+
+                  # Check for FIPS exemption based on createdAt date
+                  is_legacy_bundle=false
+                  if [ -n "${created_at}" ]; then
+                    echo "Bundle createdAt: ${created_at}"
+                    # Convert createdAt to Unix timestamp for comparison
+                    created_at_ts=$(date -d "${created_at}" +%s 2>/dev/null || echo "")
+
+                    if [ -n "${created_at_ts}" ] && [ "${created_at_ts}" -lt "${FIPS_CUTOFF_EPOCH}" ]; then
+                      is_legacy_bundle=true
+                      echo "Bundle was created before FIPS requirement date (${FIPS_CUTOFF_DATE})"
+                    fi
+                  else
+                    echo "No createdAt annotation found on bundle"
+                  fi
+
+                  if [ "${is_legacy_bundle}" = true ]; then
+                    # Legacy bundle (created before FIPS requirement date)
+                    if [ -n "${fips_annotation}" ] && [ "${fips_annotation}" = "true" ]; then
+                      echo "Legacy bundle claims fips-compliant=true. Running FIPS static check to verify compliance..."
+                    else
+                      echo "Legacy bundle created before ${FIPS_CUTOFF_DATE} is exempt from FIPS check. Skipping FIPS static check for ${bundle}"
+                      decision="SKIP"
+                    fi
+                  else
+                    echo "Bundle created on or after FIPS requirement date. Running the FIPS static check..."
+                  fi
+                fi
+
+                if [ "${decision}" == "SKIP" ]; then
+                  bundle_scan_decision_map["$bundle"]="SKIP"
+                else
+                  bundle_scan_decision_map["$bundle"]="SCAN"
+                  bundle_related_images_map["$bundle"]="$(extract_related_images_from_bundle "$render_ref")"
+                fi
+              fi
+
+              # Attribute this bundle's related images to the current OCP version.
+              if [ "${bundle_scan_decision_map["$bundle"]}" == "SCAN" ] && [ -n "${bundle_related_images_map["$bundle"]:-}" ]; then
+                ocp_version_related_images_map["$ocp_version"]="${ocp_version_related_images_map["$ocp_version"]:-} ${bundle_related_images_map["$bundle"]}"
+              fi
+            done
+          done
+
+          echo "relatedImages for OCP ${ocp_version}: ${ocp_version_related_images_map["$ocp_version"]:-<none>}"
+        done
+
+        # Serialize the per-version related images into a single JSON document:
+        #   { "4.16": ["img@sha", ...], "4.17": [...] }
+        related_images_by_ocp_version_json="{}"
+        declare -i total_related_images=0
+        for ocp_version in ${OCP_VERSIONS}; do
+          related_images_by_ocp_version_json=$(echo "${related_images_by_ocp_version_json}" | jq \
+            --arg v "${ocp_version}" \
+            --arg imgs "${ocp_version_related_images_map["$ocp_version"]:-}" \
+            '.[$v] = ($imgs | split(" ") | map(select(length > 0)) | unique)')
+          count=$(echo "${related_images_by_ocp_version_json}" | jq --arg v "${ocp_version}" '.[$v] | length')
+          total_related_images=$((total_related_images + count))
+        done
+
+        echo "Related images per OCP version:"
+        echo "${related_images_by_ocp_version_json}" | jq '.' | tee "/tekton/home/related_images_by_version.json"
+
+        if [ "${total_related_images}" -eq 0 ]; then
+          echo "No related images found for any targeted OCP version. Nothing to scan."
+        fi
+
+        # If the image is an Image Index, also add the Image Index digest to the list.
+        if [[ "${digests_processed[*]}" != *"$IMAGE_DIGEST"* ]]; then
+          digests_processed+=("\"$IMAGE_DIGEST\"")
+        fi
+        digests_processed_string=$(
+          IFS=,
+          echo "${digests_processed[*]}"
+        )
+
+        echo "${images_processed_template/\[%s]/[$digests_processed_string]}" >"/tekton/home/images_processed.txt"
+      computeResources:
+        limits:
+          cpu: "1"
+          memory: 12Gi
+        requests:
+          cpu: "1"
+          memory: 12Gi
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
+          add:
+            - SETFCAP
+        readOnlyRootFilesystem: true
+      volumeMounts:
+        - mountPath: /tmp
+          name: tmp
+
+    - name: split-into-buckets
+      image: quay.io/konflux-ci/konflux-test:v1.5.9@sha256:7faaebc542c61704003fecbab81a9c81c9770b4df8c5bba18459fba3f58e9c51
+      env:
+        - name: NUM_BUCKETS
+          value: $(params.NUM_BUCKETS)
+        - name: SIZE_FETCH_PARALLEL
+          value: $(params.SIZE_FETCH_PARALLEL)
+      script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        echo "=========================================="
+        echo "Splitting images into per-version buckets (grid width up to ${NUM_BUCKETS})"
+        echo "=========================================="
+
+        mkdir -p /var/workdir/buckets
+
+        # Copy metadata files for the check task (including test_output.txt for error propagation).
+        # Note: target_ocp_version.txt is intentionally NOT copied - each check branch derives its
+        # own OCP version from the OCP_VERSION matrix param.
+        copy_metadata() {
+          for file in related-images-map.txt images_processed.txt test_output.txt; do
+            if [ -f "/tekton/home/${file}" ]; then
+              cp "/tekton/home/${file}" /var/workdir/buckets/
+            fi
+          done
+        }
+
+        # Write the OCP_VERSIONS and BUCKET_INDICES array results used for matrix expansion.
+        # $1 = JSON array of versions, $2 = grid width (number of bucket indices)
+        emit_results() {
+          local versions_json="$1"
+          local width="$2"
+          local indices_json="["
+          local i
+          for ((i=0; i<width; i++)); do
+            if [ "$i" -gt 0 ]; then
+              indices_json+=","
+            fi
+            indices_json+="\"${i}\""
+          done
+          indices_json+="]"
+          echo -n "${versions_json}" > "$(results.OCP_VERSIONS.path)"
+          echo -n "${indices_json}" > "$(results.BUCKET_INDICES.path)"
+          echo "OCP_VERSIONS: ${versions_json}"
+          echo "BUCKET_INDICES: ${indices_json}"
+        }
+
+        # Emit a minimal 1x1 grid so a single check worker always runs - it propagates any
+        # error from the extraction step (via test_output.txt) or simply no-ops when there is
+        # nothing to scan.
+        emit_minimal_grid() {
+          copy_metadata
+          : > "/var/workdir/buckets/bucket-none-0.txt"
+          echo "0" > "$(results.TOTAL_IMAGES.path)"
+          emit_results '["none"]' 1
+        }
+
+        if [ ! -f /tekton/home/related_images_by_version.json ]; then
+          echo "No related_images_by_version.json found (extraction failed or produced nothing)."
+          emit_minimal_grid
+          exit 0
+        fi
+
+        # Versions that actually have at least one related image.
+        mapfile -t versions < <(jq -r 'to_entries[] | select(.value | length > 0) | .key' /tekton/home/related_images_by_version.json)
+
+        if [ "${#versions[@]}" -eq 0 ]; then
+          echo "No related images for any version. Nothing to scan."
+          emit_minimal_grid
+          exit 0
+        fi
+
+        total_images=$(jq '[to_entries[] | .value | length] | add // 0' /tekton/home/related_images_by_version.json)
+        echo "${total_images}" > "$(results.TOTAL_IMAGES.path)"
+        echo "Total (image, version) pairs: ${total_images}"
+
+        # Load image mirror map if available (used to fetch sizes for mirrored images).
+        image_mirror_map=""
+        if [ -f /tekton/home/related-images-map.txt ]; then
+          image_mirror_map=$(cat /tekton/home/related-images-map.txt)
+          echo "Loaded image mirror map for size fetching"
+        fi
+
+        fetch_size() {
+          # shellcheck source=/dev/null
+          . /utils.sh
+
+          local img=$1
+          local mirror_map=$2
+          local size=0
+
+          # Try original image first
+          if size=$(skopeo inspect "docker://${img}" 2>/dev/null | jq '[.LayersData[]?.Size // 0] | add // 0' 2>/dev/null); then
+            if [ "$size" -gt 0 ]; then
+              echo "${img}|${size}"
+              return 0
+            fi
+          fi
+
+          # Original failed or returned 0, try mirrors if available
+          if [ -n "$mirror_map" ]; then
+            reg_and_repo=$(get_image_registry_and_repository "${img}")
+            mapfile -t mirrors < <(get_image_mirror_list "${reg_and_repo}" "${mirror_map}")
+
+            if [[ -n "${mirrors[0]}" ]]; then
+              echo "Trying ${#mirrors[@]} mirror(s) for ${img}..." >&2
+
+              for mirror in "${mirrors[@]}"; do
+                replaced_image=$(replace_image_pullspec "$img" "$mirror")
+                echo "  Attempting mirror: ${replaced_image}" >&2
+
+                if size=$(skopeo inspect "docker://${replaced_image}" 2>/dev/null | jq '[.LayersData[]?.Size // 0] | add // 0' 2>/dev/null); then
+                  if [ "$size" -gt 0 ]; then
+                    echo "  Mirror succeeded, size: $((size / 1024 / 1024)) MB" >&2
+                    echo "${img}|${size}"
+                    return 0
+                  fi
+                fi
+                echo "  Mirror failed or returned size 0" >&2
+              done
+            fi
+          fi
+
+          # All attempts failed, return size 0
+          echo "${img}|0"
+        }
+        export -f fetch_size
+        export image_mirror_map
+
+        # Distribute each version's images into buckets, tracking the widest version so the
+        # matrix grid can be padded to a uniform width.
+        grid_width=1
+        for version in "${versions[@]}"; do
+          mapfile -t images < <(jq -r --arg v "$version" '.[$v][]' /tekton/home/related_images_by_version.json)
+          num_images=${#images[@]}
+
+          # Calculate actual number of buckets for this version: max(1, min(NUM_BUCKETS, num_images))
+          if [ "${num_images}" -lt "${NUM_BUCKETS}" ]; then
+            actual_buckets=${num_images}
+          else
+            actual_buckets=${NUM_BUCKETS}
+          fi
+          if [ "${actual_buckets}" -lt 1 ]; then
+            actual_buckets=1
+          fi
+          if [ "${actual_buckets}" -gt "${grid_width}" ]; then
+            grid_width=${actual_buckets}
+          fi
+          echo "OCP ${version}: ${num_images} images across ${actual_buckets} bucket(s)"
+
+          # Initialize this version's buckets
+          for ((i=0; i<actual_buckets; i++)); do
+            : > "/var/workdir/buckets/bucket-${version}-${i}.txt"
+          done
+
+          # Fetch image sizes in parallel for load balancing
+          # shellcheck disable=SC2016
+          readarray -t sized_images < <(printf '%s\n' "${images[@]}" | xargs -P "${SIZE_FETCH_PARALLEL}" -I {} bash -c 'fetch_size "$@" "$1"' _ {} "$image_mirror_map")
+
+          # Sort by size (largest first)
+          readarray -t sorted < <(printf '%s\n' "${sized_images[@]}" | sort -t'|' -k2 -rn)
+
+          # Greedy algorithm: assign each image to the lightest bucket
+          declare -a weights
+          for ((i=0; i<actual_buckets; i++)); do
+            weights[i]=0
+          done
+
+          for item in "${sorted[@]}"; do
+            img="${item%%|*}"
+            size="${item##*|}"
+
+            min_bucket=0
+            min_weight=${weights[0]}
+            for ((i=1; i<actual_buckets; i++)); do
+              if [ "${weights[$i]}" -lt "${min_weight}" ]; then
+                min_weight=${weights[$i]}
+                min_bucket=$i
+              fi
+            done
+
+            echo "${img}" >> "/var/workdir/buckets/bucket-${version}-${min_bucket}.txt"
+            weights[min_bucket]=$((weights[min_bucket] + size))
+          done
+          unset weights
+        done
+
+        # Pad every version up to the grid width with empty bucket files so that every
+        # (version, bucket) matrix cell has a file. Empty cells are a no-op in the check task.
+        for version in "${versions[@]}"; do
+          for ((i=0; i<grid_width; i++)); do
+            bucket_file="/var/workdir/buckets/bucket-${version}-${i}.txt"
+            if [ ! -f "${bucket_file}" ]; then
+              : > "${bucket_file}"
+            fi
+          done
+        done
+
+        echo "Bucket distribution:"
+        for version in "${versions[@]}"; do
+          for ((i=0; i<grid_width; i++)); do
+            count=$(wc -l < "/var/workdir/buckets/bucket-${version}-${i}.txt")
+            echo "  bucket-${version}-${i}: ${count} images"
+          done
+        done
+
+        copy_metadata
+
+        versions_json=$(printf '%s\n' "${versions[@]}" | jq -R . | jq -cs .)
+        emit_results "${versions_json}" "${grid_width}"
+        echo "Done!"
+
+    - name: create-buckets-artifact
+      image: quay.io/konflux-ci/build-trusted-artifacts:latest@sha256:a246cf2267fe6fa68ae8885c6ca4141923edca3ccf9b56838d1ebe369d31b46d
+      args:
+        - create
+        - --store
+        - $(params.ociStorage)
+        - $(results.BUCKETS_ARTIFACT.path)=/var/workdir/buckets
