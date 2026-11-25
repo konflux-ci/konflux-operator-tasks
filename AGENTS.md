@@ -78,6 +78,24 @@ Some tasks have multiple version directories (e.g., `task/foo/0.1/` and `0.2/`).
 3. **Check `CHANGELOG.md`** to understand the relationship between versions and whether divergence is intentional.
 4. **Update documentation across all versions.** Keep `README.md` and any other docs in sync when the underlying behavior changes.
 
+## Step action and task image consistency
+
+Tasks reference step actions through the git resolver, pinned to a commit SHA in the `revision` param. The step action's own `image:` is resolved from that commit, while the task's other steps keep their own `image:` fields. Updating one without the other leaves a single TaskRun running mixed image versions.
+
+When changing the `revision` of a step action reference, or bumping the image in a step action:
+
+1. **Compare images.** Check the `image:` of the step action at the new revision against the `image:` fields of the task's own steps that use the same image.
+2. **Update them together.** If they differ, bump the task's references to the same tag and digest in the same PR.
+3. **Cover every consumer.** Update all tasks that reference the step action, including OCI-TA variants and multi-version directories.
+
+For example, `fips-operator-check-step-action` and the FIPS tasks that consume it (`fbc-fips-check`, `fbc-fips-check-oci-ta`, `fips-operator-bundle-check`, `fips-operator-bundle-check-oci-ta`, `fbc-fips-check-matrix-based-oci-ta`) all use `quay.io/konflux-ci/konflux-test`. Every `konflux-test` reference in those tasks should match the step action's tag and digest. To spot drift:
+
+```bash
+grep -rn "konflux-test:" stepactions/fips-operator-check-step-action task/*fips*
+```
+
+This applies only to images shared with a step action. Unrelated tasks may pin other `konflux-test` versions.
+
 ## Workspace/OCI-TA variant consistency
 
 Some tasks exist as both a workspace variant (PVC-based) and an OCI-TA variant (trusted-artifact-based), e.g., `fbc-fips-check` and `fbc-fips-check-oci-ta`. When creating or modifying a task that has a variant counterpart:
