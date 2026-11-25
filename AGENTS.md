@@ -114,6 +114,12 @@ Other `*-oci-ta` tasks are **standalone** — they have no base task and no `rec
 - Use power-of-two memory values (64Mi, 128Mi, 256Mi, etc.). When the analyzer maximum does not align to a power-of-two, round up to the next boundary.
 - The CHANGELOG must accurately describe the sizing rule used. If values are rounded up from analyzer output, state the rounding convention (e.g., "rounded to next power-of-two") rather than claiming a different formula.
 
+## Container tooling in task steps
+
+Task steps run in minimal container images. Do not assume tools beyond standard POSIX utilities (bash, grep, sed, awk, coreutils) are available unless the task's container image explicitly includes them. Common task-specific tools include `oc`, `opm`, `cosign`, `skopeo`, and `syft`, but these vary by task.
+
+Tools like `jq`, `yq`, and `python` are generally NOT available. When reviewing code that parses structured output (JSON, YAML), verify the suggested parsing tool is present in the step's container image before recommending it as a fix. When writing new task step scripts, use POSIX-compatible parsing (grep, sed, awk) unless the step's image is known to include a structured parser.
+
 ## CI checks
 
 YAML lint, Checkton, ShellSpec, Tekton integration tests, Go tests (task-generator), and migration validation all run on PRs. Check `.github/workflows/` for details.
