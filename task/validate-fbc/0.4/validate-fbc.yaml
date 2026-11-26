@@ -596,7 +596,7 @@ spec:
         requests:
           cpu: 100m
           memory: 1Gi
-      image: quay.io/konflux-ci/operator-foundry:0.1@sha256:dfea0aeaaa701bfc45fbb0082bbd101dd1de77da3aaf8605cbb5ab36ba419390
+      image: quay.io/konflux-ci/operator-foundry:0.1@sha256:39eba0f4a8ca45b048a517c4d2385c24ac84e993a23d89262fc776d21def73f2
       # Non-root: earlier steps use HOME=/tmp as root and leave root-owned
       # /tmp/.docker. A step-local HOME lets Tekton cred-init copy SA pull
       # secrets into a writable path without runAsUser: 0.
