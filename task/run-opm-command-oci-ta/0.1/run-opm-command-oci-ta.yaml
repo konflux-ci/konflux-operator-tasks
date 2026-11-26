@@ -74,7 +74,7 @@ spec:
         subPath: ca-bundle.crt
   steps:
     - name: use-trusted-artifact
-      image: quay.io/konflux-ci/build-trusted-artifacts:latest@sha256:a246cf2267fe6fa68ae8885c6ca4141923edca3ccf9b56838d1ebe369d31b46d
+      image: quay.io/konflux-ci/build-trusted-artifacts:latest@sha256:6d4704e8f9722f1f62aff722ab226d06fd40d61eb226d3d8df8f700592ef6ba7
       computeResources:
         requests:
           memory: 64Mi
@@ -367,7 +367,7 @@ spec:
         - mountPath: /tmp
           name: tmp
     - name: create-trusted-artifact
-      image: quay.io/konflux-ci/build-trusted-artifacts:latest@sha256:a246cf2267fe6fa68ae8885c6ca4141923edca3ccf9b56838d1ebe369d31b46d
+      image: quay.io/konflux-ci/build-trusted-artifacts:latest@sha256:6d4704e8f9722f1f62aff722ab226d06fd40d61eb226d3d8df8f700592ef6ba7
       when:
         - input: "$(steps.run-opm-with-user-args.results.skip_create_trusted_artifact)"
           operator: in
