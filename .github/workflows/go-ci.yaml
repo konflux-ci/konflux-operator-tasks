@@ -6,6 +6,7 @@ name: Validate PR - golang CI
     types: [checks_requested]
 permissions:
   contents: read
+  id-token: write
 jobs:
   lint:
     name: Lint
@@ -65,7 +66,15 @@ jobs:
       - name: Tests
         working-directory: ${{matrix.path}}
         run: |
-          go test ./...
+          go test ./... -coverprofile=coverage.out -covermode=atomic
+
+      - name: Upload coverage to Codecov
+        if: always()
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          use_oidc: true
+          files: ${{matrix.path}}/coverage.out
+          flags: unit-tests
 
   security_scan:
     name: Security scan
