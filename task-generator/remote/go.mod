@@ -73,7 +73,7 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	k8s.io/client-go v0.37.2 // indirect
-	k8s.io/kube-openapi v0.0.0-20261104182252-5bee61fc5225 // indirect
+	k8s.io/kube-openapi v0.0.0-20261124193638-7c5f465a2be7 // indirect
 	k8s.io/utils v0.0.0-20261023123148-ca04ba58ecab // indirect
 	knative.dev/pkg v0.0.0-20250716115900-19d3cc2da0b9 // indirect
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
